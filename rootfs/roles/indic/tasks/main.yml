@@ -1,0 +1,108 @@
+---
+# Assumes pytorch has already been installed as apart of SDK / base installation
+# This container may not be necessary....
+# - name: Install pytorch:25.06 container
+#   community.docker.docker_image_pull:
+#     name: nvcr.io/nvidia/pytorch:25.06-py3
+#   become: true
+
+# Ctranslate2 requires a dependency from intel's OneAPI
+- name: Add Intel OneAPI keyring
+  shell: wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+  become: true
+
+- name: Add to apt
+  shell: echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+  become: true
+
+- name: Install Ctranslate2 dependencies
+  ansible.builtin.apt:
+    pkg:
+    - libomp5-14
+    update_cache: yes
+  become: true
+
+# This deb was created by cloning CTranslate2 onto the Jetson
+# The following was added to the bottom of CMakeLists.txt
+# +SET(CPACK_GENERATOR "DEB")
+# +SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "AT")
+# +SET(CPACK_DEBIAN_PACKAGE_SHLIBDEPS "ON")
+# +INCLUDE(CPack)
+# Then it was built with the following commands:
+# mkdir build && cd build
+# cmake .. -DWITH_MKL=OFF -DWITH_CUDA=ON -DWITH_CUDNN=ON -DWITH_OPENBLAS=ON
+# cmake --build .
+# sudo cpack
+
+- name: Copy ctranslate2 .deb
+  copy:
+    src: ctranslate2-0.1.1-Linux.deb
+    dest: /tmp/ctranslate2-0.1.1-Linux.deb
+
+# The following was built from the Ctranslate2 repository
+# by running 
+# cd python
+# pip install -r install_requirements.txt
+# python setup.py bdist_wheel
+
+- name: Copy ctranslate2 python .whl
+  copy:
+    src: ctranslate2-4.6.3-cp310-cp310-linux_aarch64.whl
+    dest: /tmp/ctranslate2-4.6.3-cp310-cp310-linux_aarch64.whl
+
+- name: Install the ctranslate2 .deb
+  ansible.builtin.apt:
+    deb: /tmp/ctranslate2-0.1.1-Linux.deb
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Install ctranslate2 python bindings .whl
+  ansible.builtin.pip:
+    name: /tmp/ctranslate2-4.6.3-cp310-cp310-linux_aarch64.whl
+    state: present
+
+# Unpack
+- name: Extract ASR model from local archive
+  ansible.builtin.unarchive:
+    src: ASR-Hindi-CPUquantized.zip
+    dest: ~/
+
+- name: Strip torch dependencies from requirements
+  shell: sed -i '/.*torch.*/d' ~/static_asr_inference/requirements.txt
+
+- name: Install ASR python dependencies
+  ansible.builtin.pip:
+    requirements: ~/static_asr_inference/requirements.txt
+    virtualenv: ~/static_asr_inference/venv
+    virtualenv_site_packages: yes
+
+- name: Force numpy compatibility
+  ansible.builtin.pip:
+    name: numpy<2
+    virtualenv: ~/static_asr_inference/venv
+    virtualenv_site_packages: yes
+
+# Unpack
+- name: Extract NMT model from local archive
+  ansible.builtin.unarchive:
+    src: nmt_trans.zip
+    dest: ~/
+
+- name: Strip torch dependencies from requirements
+  shell: sed -i '/.*torch.*/d' ~/ctranslate2_inference/requiremennts.txt
+
+- name: Strip ctranslate from requirements
+  shell: sed -i '/.*ctranslate2.*/d' ~/ctranslate2_inference/requiremennts.txt
+
+- name: Install NMT python dependencies
+  ansible.builtin.pip:
+    requirements: ~/ctranslate2_inference/requiremennts.txt
+    virtualenv: ~/ctranslate2_inference/venv
+    virtualenv_site_packages: yes
+
+- name: Force numpy compatibility
+  ansible.builtin.pip:
+    name: numpy<2
+    virtualenv: ~/ctranslate2_inference/venv
+    virtualenv_site_packages: yes

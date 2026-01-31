@@ -1,0 +1,29 @@
+---
+- name: Install onnxruntime-gpu 
+  ansible.builtin.pip:
+    name:
+      - onnxruntime
+      - onnxruntime-gpu
+    extra_args: --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
+  become: true
+
+- name: Install additional deps
+  ansible.builtin.apt:
+    pkg:
+    - libasound-dev
+    - portaudio19-dev
+    - libportaudio2
+    - ffmpeg
+    - flac
+
+  become: true
+- name: Install global python dependencies
+  ansible.builtin.pip:
+    name:
+      - pyaudio
+      - vosk
+      - piper-tts
+      - SpeechRecognition
+      - ollama
+  become: true
+    
