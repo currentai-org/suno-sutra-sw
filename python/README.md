@@ -1,0 +1,1 @@
+This is a python project containing the application of the Pocket Inference device. This is a python package called `pocketinfer` that also includes one or more system scripts that will run on the device. This can be installed by executing `pip install .` from within this directory, or `pip install -e .` for developer mode.
