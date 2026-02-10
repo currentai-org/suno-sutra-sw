@@ -28,7 +28,6 @@ def main(args):
         return 0
 
     board = Board.get_board()
-    board.wraptext("Initializing...")
     board.statusbar("Start: {}".format(args.app))
     board.button_led(False)
 

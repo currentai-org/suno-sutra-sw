@@ -97,14 +97,14 @@ class PocketInferDemo(Board):
         self.ioexp = IOInterface()
         self.ioexp.subscribe(self.ioexp_cb)
         self.ioexp.open()
-        self.audio = audio.AudioRecorder(devname='USB Audio Device', rate=44100, frames_per_buffer=4096)
+        self.audio = audio.AudioRecorder(devname='USB PnP Sound Device', rate=44100, frames_per_buffer=4096)
 
     def ioexp_cb(self, msg):
-        if msg == 'B0':
+        if msg == 'BD1':
             self.trigger_button_down.set()
             self.trigger_button = True
             self.logger.debug("Trigger button down")
-        elif msg == 'B1':
+        elif msg == 'BD0':
             self.trigger_button_up.set()
             self.trigger_button = False
             self.logger.debug("Trigger button up")
@@ -160,22 +160,16 @@ class PocketInferDemo(Board):
 
     def clear_screen(self):
         self.ioexp.ser.write('''
-        disp.fill(0)
-        disp.show()
+        TT
+        TB
+        TS 
         '''.encode('utf-8'))
 
     def statusbar(self, text):
-        self.ioexp.ser.write(f'''
-        disp.fill_rect(0,57,128,9,0)
-        disp.text("{text}", 0,57,1)
-        disp.show()
-        '''.encode('utf-8'))
+        return self.ioexp.transact(f'TS{text}')
 
-    def wraptext(self, text):
-        lines = [text[idx:idx+20] for idx in range(0, len(text), 20)]
-        xidx = 0
-        self.ioexp.ser.write(b'disp.fill_rect(0,0,128,56,0)\n')
-        for line in lines[:7]:
-            self.ioexp.ser.write(f'disp.text("{line}",0, {xidx},1)\n'.encode('utf-8'))
-            xidx += 8
-        self.ioexp.ser.write(b'disp.show()\n')
+    def top_text(self, text):
+        return self.ioexp.transact(f'TT{text}')
+    
+    def bottom_text(self, text):
+        return self.ioexp.transact(f'TB{text}')

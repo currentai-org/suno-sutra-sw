@@ -5,6 +5,8 @@ from pocketinfer.models.ollama import Ollama
 from pocketinfer.models.piper import Piper
 from pocketinfer.models.vosk import Vosk
 
+import time
+
 
 # Register this class as an application that can run on the Pocket Infer Device
 # The argument here is a dictionary of metadata about the application
@@ -36,22 +38,28 @@ class HearTheWorldEn(BaseApplication):
         while self.running:
             self.board.statusbar("Ready - Press Button")
             self.board.wait_for_trigger_button_down()
+            audio_start = time.time()
             # When user presses button, start recording audio and snap a photo
             self.piper.stop_playback()  # If previous TTS is still playing, stop it
             self.board.audio.start()
             img = self.board.camera_frame_jpg()
             self.board.statusbar("Release Button")
-            self.board.wraptext("")
+            self.board.top_text("")
+            self.board.bottom_text("")
             self.board.wait_for_trigger_button_up()
+            audio_stop = time.time()
             # When user releases button, stop recording
             self.board.audio.stop()
             self.board.statusbar("Running: ASR")
+            asr_start = time.time()
             # Perform ASR on the recorded audio, convert it to text
             value = self.vosk.recognize(self.board.audio.to_audio_data())
+            asr_stop = time.time()
             self.logger.info("Detected query is '{}'".format(value))
-            self.board.wraptext(value)
+            self.board.top_text(value)
             # Perform LLM inference on the recognized text + image
             self.board.statusbar("Running: LLM")
+            llm_start = time.time()
             resp = self.ollama.chat([
                 {
                     'role': 'user',
@@ -59,9 +67,12 @@ class HearTheWorldEn(BaseApplication):
                     'images':[img],
                 }
             ])
+            llm_end = time.time()
             self.logger.info("Result is '{}'".format(resp.message.content))
-            self.board.wraptext(resp.message.content)
+            self.board.bottom_text(resp.message.content)
             # Perform TTS on the LLM response, convert it to audio and play it back
             self.board.statusbar("Running: Playback")
             self.piper.start_playback(resp.message.content)
+            app_end = time.time()
+            self.logger.debug(f"Total Run time {app_end-audio_start}s, audio {audio_stop-audio_start}s, ASR {asr_stop-asr_start}, LLM {llm_end-llm_start}")
             # Loop back around and prepare for the next interaction
