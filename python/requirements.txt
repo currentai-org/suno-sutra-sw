@@ -1,0 +1,9 @@
+pyserial
+ollama
+pyaudio
+numpy
+SpeechRecognition
+vosk
+piper-tts
+appdirs
+opencv-python

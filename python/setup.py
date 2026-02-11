@@ -1,5 +1,8 @@
 from setuptools import setup, find_packages
 
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
+
 setup(
     name='pocketinfer',
     version='0.1.0',
@@ -11,16 +14,10 @@ setup(
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     license='MIT',
-    install_requires=[
-        'pyserial',
-        'ollama',
-        'pyaudio',
-        'numpy',
-        'SpeechRecognition',
-        'vosk',
-        'piper-tts',
-        'appdirs',
-    ],
+    install_requires=requirements,
+    entry_points={
+        'console_scripts': ['pocketinfer-service=pocketinfer.service:main'],
+    },
     classifiers=[
         'Programming Language :: Python :: 3',
         'Operating System :: OS Independent',
