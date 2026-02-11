@@ -1,3 +1,6 @@
+# Personal workspace files
+*.code-workspace
+
 # Strange Circuit Python MSC files
 .Trash-1000
 .Trashes

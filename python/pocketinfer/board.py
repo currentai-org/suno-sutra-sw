@@ -4,6 +4,7 @@ from pocketinfer.serialcomms import IOInterface
 import threading
 import logging
 import cv2
+import wave
 from pocketinfer import audio
 
 
@@ -19,7 +20,7 @@ class CameraIterable:
         return frame
 
 class Board:
-    CV2_INDEX = 0
+    CV2_INDEX = None
     ALSA_PLAYBACK_DEVICE = "default"
 
     def __init__(self, args):
@@ -85,12 +86,58 @@ class Board:
             return PocketInferDemo(args)
         raise NotImplementedError('Unsupported Carrier Board: '+carrier_ver.decode('utf-8'))
 
+class DummyBoard(Board):
+    def __init__(self, args):
+        super().__init__(args)
+        self.logger.info("Using DummyBoard - no hardware features will work")
+        self.audio = audio.DummyAudioRecorder(args['audio_file'])
+
+    def wait_for_trigger_button_down(self, timeout=None):
+        self.trigger_button_down.clear()
+        return
+    
+    def wait_for_trigger_button_up(self, timeout=None):
+        self.trigger_button_up.clear()
+        return
+    
+    def camera_frame(self):
+        if 'image_file' not in self.args:
+            return None
+        img = self.args.get('image_file')
+        if isinstance(img, str):
+            if not exists(img):
+                raise FileNotFoundError(f"DummyBoard image file '{img}' not found")
+            return cv2.imread(img)
+        if isinstance(img, bytes):
+            return cv2.imdecode(img, cv2.IMREAD_COLOR)
+        return img
+
+    def button_led(self, value):
+        return True
+        
+    def rgb_led(self, r, g=None, b=None):
+        return True
+
+    def clear_screen(self):
+        return
+
+    def statusbar(self, text):
+        return True
+
+    def top_text(self, text):
+        return True
+    
+    def bottom_text(self, text):
+        return True
+    
 
 class PocketInferDevboard(Board):
+    CV2_INDEX = 0
     pass
 
 class PocketInferDemo(Board):
     ALSA_PLAYBACK_DEVICE = "hw:2,0"
+    CV2_INDEX = 0
 
     def __init__(self, args):
         super().__init__(args)

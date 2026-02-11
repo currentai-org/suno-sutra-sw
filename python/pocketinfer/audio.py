@@ -26,7 +26,6 @@ def noalsaerr():
     yield
     asound.snd_lib_error_set_handler(None)
 
-
 class AudioRecorder:
     def __init__(self, device_idx=0, devname=None, rate=16000, channels=1, frames_per_buffer=1024):
         self.rate = rate
@@ -103,6 +102,24 @@ class AudioRecorder:
 
     def terminate(self):
         self.p.terminate()
+
+class DummyAudioRecorder(AudioRecorder):
+    def __init__(self, filename):
+        self.filename = filename
+        self.channels = 1 
+        self.frames_per_buffer = 1024
+        self.frames = []
+
+    def start(self):
+        # open the file for reading.
+        self.frames = []
+
+    def stop(self):
+        with wave.open(self.filename, 'rb') as wf:
+            if wf.getnchannels() != 1 or wf.getsampwidth() != 2:
+                raise ValueError("Audio file must be mono, 16-bit")
+            self.rate = wf.getframerate() 
+            self.frames = [wf.readframes(wf.getnframes())]
 
 
 # The following was modified from piper's audio_playback.py to add device selection
