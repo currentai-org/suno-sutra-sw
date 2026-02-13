@@ -6,9 +6,13 @@ class Ollama:
     def __init__(self, model_name: str):
         self.logger = logging.getLogger(__name__)
         self.model_name = model_name
+        #TODO execute curl http://localhost:11434/api/generate -d '{"model": model_name, "keep_alive": -1}'
 
     def chat(self, messages: list) -> ollama.ChatResponse:
         return ollama.chat(model=self.model_name, messages=messages)
+
+    def generate(self, images, prompt):
+        return ollama.generate(model=self.model_name, images=images, prompt=prompt)
     
     @classmethod
     def verify(cls, args):

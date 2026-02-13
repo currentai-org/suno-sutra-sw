@@ -8,6 +8,7 @@ class BaseApplication:
 
     def __init__(self, board):
         self.logger = logging.getLogger(__name__)
+        self.settings = self.METADATA.get("default_settings", {})
         self.board = board
         self.thread = threading.Thread()
         self.running = False

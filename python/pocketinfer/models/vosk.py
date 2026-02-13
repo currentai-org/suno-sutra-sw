@@ -40,7 +40,7 @@ class Vosk:
         if verbose:
             return result
 
-        return result["text"]
+        return result
 
     
     @classmethod

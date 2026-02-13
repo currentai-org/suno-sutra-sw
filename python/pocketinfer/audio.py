@@ -81,7 +81,7 @@ class AudioRecorder:
     def save_to_file(self, filename):
         wf = wave.open(filename, 'wb')
         wf.setnchannels(self.channels)
-        wf.setsampwidth(self.p.get_sample_size(pyaudio.paInt16))
+        wf.setsampwidth(2) # 16-bit
         wf.setframerate(self.rate)
         wf.writeframes(b''.join(self.frames))
         wf.close()
@@ -165,7 +165,7 @@ class AudioPlayer:
                     self._proc.stdin.close()
             except Exception:
                 pass
-            self._proc.wait(timeout=5)
+            self._proc.wait(timeout=60)
 
     def play(self, audio_bytes: bytes) -> None:
         """Plays raw audio using ffplay."""

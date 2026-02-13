@@ -19,6 +19,38 @@ class CameraIterable:
             raise StopIteration
         return frame
 
+class CameraReader:
+    def __init__(self, camera_index):
+        self.camera_index = camera_index
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.frame = None
+        self.running = False
+        self.frame_available = threading.Event()
+
+    def start(self):
+        self.running = True
+        self.thread.start()
+    
+    def _run(self):
+        self.cap = cv2.VideoCapture(self.camera_index)
+        if not self.cap.isOpened():
+            raise RuntimeError(f"Unable to open VideoCapture({self.camera_index})")
+        try:
+            while self.running:
+                ret, frame = self.cap.read()
+                if not ret:
+                    continue
+                self.frame = frame
+                self.frame_available.set()
+        finally:
+            self.running = False
+            self.cap.release()
+
+    def stop(self):
+        self.running = False
+        self.thread.join()
+        self.cap.release()
+
 class Board:
     CV2_INDEX = None
     ALSA_PLAYBACK_DEVICE = "default"
@@ -29,7 +61,7 @@ class Board:
         self.trigger_button = False
         self.trigger_button_down = threading.Event()
         self.trigger_button_up = threading.Event()
-        self.cap = cv2.VideoCapture(self.CV2_INDEX)
+        self.camera = CameraReader(self.CV2_INDEX)
     
     def wait_for_trigger_button_down(self, timeout=None):
         self.trigger_button_down.clear()
@@ -40,14 +72,11 @@ class Board:
         self.trigger_button_up.wait(timeout=timeout)
 
     def camera_frame(self):
-        if not self.cap.isOpened():
-            self.cap = cv2.VideoCapture(self.CV2_INDEX)
-            if not self.cap.isOpened():
-                raise RuntimeError(f"Unable to re-open VideoCapture({self.CV2_INDEX})")
-        ret, frame = self.cap.read()
-        if not ret:
-            return None
-        return frame
+        if not self.camera.running:
+            self.camera.frame_available.clear()
+            self.camera.start()
+            self.camera.frame_available.wait(timeout=5.0)
+        return self.camera.frame
 
     def camera_frames(self):
         return CameraIterable(self)
