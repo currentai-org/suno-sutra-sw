@@ -176,11 +176,11 @@ class PocketInferDemo(Board):
         self.audio = audio.AudioRecorder(devname='USB PnP Sound Device', rate=44100, frames_per_buffer=4096)
 
     def ioexp_cb(self, msg):
-        if msg == 'BD1':
+        if msg == 'BT0':
             self.trigger_button_down.set()
             self.trigger_button = True
             self.logger.debug("Trigger button down")
-        elif msg == 'BD0':
+        elif msg == 'BT1':
             self.trigger_button_up.set()
             self.trigger_button = False
             self.logger.debug("Trigger button up")

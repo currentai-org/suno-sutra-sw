@@ -83,12 +83,15 @@ class HearTheWorld(BaseApplication):
             raw_query = asr_result['text']
             asr_stop = time.time()
             self.logger.info("Detected query is '{}'".format(raw_query))
-            # self.board.top_text(query)
+            self.board.top_text(raw_query)
             # Perform NMT on the recognized text, convert it to the target language
-            self.board.statusbar(f"Running: NMT {self.settings['input_language']} -> en")
-            query = self.nmt.infer(raw_query, self.settings["input_language"], "EN")['translated_text']
-            self.logger.info("Translated query is '{}'".format(query))
-            self.board.top_text(query)
+            if self.settings['input_language'] != 'en':
+                self.board.statusbar(f"Running: NMT {self.settings['input_language']} -> en")
+                query = self.nmt.infer(raw_query, self.settings["input_language"], "EN")['translated_text']
+                self.logger.info("Translated query is '{}'".format(query))
+            else:
+                query = raw_query
+            # self.board.top_text(query)
             nmt_a_stop = time.time()
             # Perform LLM inference on the recognized text + image
             self.board.statusbar("Running: LLM")
@@ -99,11 +102,14 @@ class HearTheWorld(BaseApplication):
             self.logger.info("Result is '{}'".format(result))
             self.board.bottom_text(result)
             # Perform NMT on the LLM response, convert it back to the original language
-            self.board.statusbar(f"Running: NMT en -> {self.settings['output_language']}")
-            nmt_result = self.nmt.infer(result, "EN", self.settings["output_language"])['translated_text']
-            self.logger.info("Translated result is '{}'".format(nmt_result))
-            nmt_b_stop = time.time()
-            # self.board.bottom_text(nmt_result)
+            if self.settings['output_language'] != 'en':
+                self.board.statusbar(f"Running: NMT en -> {self.settings['output_language']}")
+                nmt_result = self.nmt.infer(result, "EN", self.settings["output_language"])['translated_text']
+                self.logger.info("Translated result is '{}'".format(nmt_result))
+                nmt_b_stop = time.time()
+            else:
+                nmt_result = result
+            self.board.bottom_text(nmt_result)
             # Perform TTS on the LLM response, convert it to audio and play it back
             self.board.statusbar("Running: Playback")
             tts_result = self.tts.infer(nmt_result, self.settings["output_language"])
