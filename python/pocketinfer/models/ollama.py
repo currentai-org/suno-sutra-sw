@@ -1,5 +1,7 @@
 import ollama
 import logging
+from subprocess import check_output
+import requests
 
 
 class Ollama:
@@ -13,6 +15,10 @@ class Ollama:
 
     def generate(self, images, prompt):
         return ollama.generate(model=self.model_name, images=images, prompt=prompt)
+
+    def restart(self):
+        print(check_output('systemctl restart ollama', shell=True))
+        requests.post('http://localhost:11434/api/generate', json={'model': self.model_name, 'keep_alive': -1})
     
     @classmethod
     def verify(cls, args):
@@ -20,6 +26,7 @@ class Ollama:
             ret = ollama.list()
             for model in ret.models:
                 if model.model == args["model_name"]:
+                    requests.post('http://localhost:11434/api/generate', json={'model': args['model_name'], 'keep_alive': -1})
                     return True, "Ollama service is available."
             return False, f"Model '{args['model_name']}' not found."
         except Exception as e:

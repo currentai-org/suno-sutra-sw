@@ -3,15 +3,22 @@ import sys
 import argparse
 import logging
 import time
+import threading
 from pocketinfer.applications import *
 from pocketinfer.applications.registry import ApplicationRegistry
 from pocketinfer.board import Board, DummyBoard
+from psutil import virtual_memory
 
+
+def _update_stats(board):
+    while True:
+        board.memory_text(f"{int(virtual_memory().percent)}%")
+        time.sleep(2.0)
 
 def main():
     parser = argparse.ArgumentParser(description="PocketInfer Application Runner")
     parser.add_argument('--log-level', type=str, default='INFO', help='Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
-    parser.add_argument('--app', type=str, default="HearTheWorldEn", help='Name of the application to run')
+    parser.add_argument('--app', type=str, default="HearTheWorld", help='Name of the application to run')
     parser.add_argument('--list-apps', action='store_true', help='List available applications and exit')
     parser.add_argument('--update_app', action='store_true', default=False, help='Install dependencies for the specified application and exit')
     parser.add_argument('--dummy-board', action='store_true', default=False, help='Do not use hardware features - load audio and image from file')
@@ -40,11 +47,13 @@ def main():
         board = Board.get_board()
     else:
         board = DummyBoard(vars(args))
-    board.statusbar("Start: {}".format(args.app))
+    threading.Thread(target=_update_stats, args=(board,), daemon=True).start()
+    board.statusbar("Starting: {}...".format(args.app))
     board.button_led(False)
 
     app_cls.verify_dependencies()
     logging.info(f"Starting application: {args.app}")
+    board.mode_text(f"App {args.app}")
     app = app_cls(board)
     app.start()
     if args.dummy_board:

@@ -12,11 +12,14 @@ from pocketinfer.models.tts import Tts
 from pocketinfer.audio import AudioPlayer
 
 from io import BytesIO
+from subprocess import check_output
 
 import time
 import wave
 import os
 import json
+import sys
+import threading
 
 
 # Register this class as an application that can run on the Pocket Infer Device
@@ -38,8 +41,8 @@ import json
         "tts": {},
     },
     "default_settings": {
-        "input_language": "hi",
-        "output_language": "hi",
+        "input_language": "en",
+        "output_language": "en",
     },
     "service_dependencies": ["ollama", "bashini_models"],
 })
@@ -53,13 +56,47 @@ class HearTheWorld(BaseApplication):
         self.asr = Asr()
         self.nmt = Nmt()
         self.tts = Tts()
+        self.board.subscribe_to_ui(self.ui_cb)
         # Proceed with running the application in it's own thread
         if not os.path.exists("/tmp/hear_the_world_en_logs"):
             os.makedirs("/tmp/hear_the_world_en_logs")
         super().start()
 
+    def ui_cb(self, msg):
+        if msg == 'Reset':
+            self.logger.info('Reset!')
+            check_output('systemctl restart pocketinfer', shell=True)
+        elif msg == 'Reboot':
+            self.logger.info('REbooting!')
+            check_output('reboot', shell=True)
+        elif msg.startswith('ASR'):
+            self.settings['input_language'] = msg[4:].lower()
+        elif msg.startswith('TTS'):
+            self.settings['output_language'] = msg[4:].lower()
+
+    def delayed_write_toptext(self, text, delay=1.0):
+        def delayed_write(text, delay):
+            time.sleep(delay)
+            self.board.top_text(text)
+        th = threading.Thread(target=delayed_write, args=(text, delay), daemon=True)
+        th.start()
+
+    def delayed_write_bottext(self, text, delay=1.0):
+        def delayed_write(text, delay):
+            time.sleep(delay)
+            self.board.bottom_text(text)
+        th = threading.Thread(target=delayed_write, args=(text, delay), daemon=True)
+        th.start()
+
+    def delayed_write_led_anim(self, val, delay=1.0):
+        def delayed_write(val, delay):
+            time.sleep(delay)
+            self.board.led_animation(val)
+        th = threading.Thread(target=delayed_write, args=(val, delay), daemon=True)
+        th.start()
+
+
     def run(self):
-        self.board.clear_screen()
         while self.running:
             self.board.statusbar("Ready - Press Button")
             self.board.wait_for_trigger_button_down()
@@ -76,10 +113,14 @@ class HearTheWorld(BaseApplication):
             # When user releases button, stop recording
             self.board.audio.stop()
             self.board.statusbar("Running: ASR")
+            self.board.led_animation(1)
             asr_start = time.time()
             # Perform ASR on the recorded audio, convert it to text
-            wav_bytes = self.board.audio.to_audio_data().get_wav_data()
-            asr_result = self.asr.infer(wav_bytes, self.settings["input_language"])
+            if self.settings["input_language"] != 'en':
+                wav_bytes = self.board.audio.to_audio_data().get_wav_data()
+                asr_result = self.asr.infer(wav_bytes, self.settings["input_language"])
+            else:
+                asr_result = self.vosk.recognize(self.board.audio.to_audio_data())
             raw_query = asr_result['text']
             asr_stop = time.time()
             self.logger.info("Detected query is '{}'".format(raw_query))
@@ -89,9 +130,9 @@ class HearTheWorld(BaseApplication):
                 self.board.statusbar(f"Running: NMT {self.settings['input_language']} -> en")
                 query = self.nmt.infer(raw_query, self.settings["input_language"], "EN")['translated_text']
                 self.logger.info("Translated query is '{}'".format(query))
+                self.delayed_write_toptext(query, delay=2.0)
             else:
                 query = raw_query
-            # self.board.top_text(query)
             nmt_a_stop = time.time()
             # Perform LLM inference on the recognized text + image
             self.board.statusbar("Running: LLM")
@@ -106,12 +147,14 @@ class HearTheWorld(BaseApplication):
                 self.board.statusbar(f"Running: NMT en -> {self.settings['output_language']}")
                 nmt_result = self.nmt.infer(result, "EN", self.settings["output_language"])['translated_text']
                 self.logger.info("Translated result is '{}'".format(nmt_result))
-                nmt_b_stop = time.time()
             else:
                 nmt_result = result
-            self.board.bottom_text(nmt_result)
+            nmt_b_stop = time.time()
+            self.delayed_write_toptext(raw_query)
+            self.delayed_write_bottext(nmt_result)
             # Perform TTS on the LLM response, convert it to audio and play it back
             self.board.statusbar("Running: Playback")
+            self.delayed_write_led_anim(0)
             tts_result = self.tts.infer(nmt_result, self.settings["output_language"])
             tts_result_bytes = base64.b64decode(tts_result['audio_base64'])
             # self.piper.start_playback(result)

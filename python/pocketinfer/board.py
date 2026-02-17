@@ -62,6 +62,15 @@ class Board:
         self.trigger_button_down = threading.Event()
         self.trigger_button_up = threading.Event()
         self.camera = CameraReader(self.CV2_INDEX)
+        self.ui_cbs = []
+
+    def subscribe_to_ui(self, func):
+        if func not in self.ui_cbs:
+            self.ui_cbs.append(func)
+
+    def unsubscribe_to_ui(self, func):
+        if func in self.ui_cbs:
+            self.ui_cbs.remove(func)
     
     def wait_for_trigger_button_down(self, timeout=None):
         self.trigger_button_down.clear()
@@ -173,19 +182,27 @@ class PocketInferDemo(Board):
         self.ioexp = IOInterface()
         self.ioexp.subscribe(self.ioexp_cb)
         self.ioexp.open()
+        self.clear_screen()
+        self.statusbar("Loading...")
         self.audio = audio.AudioRecorder(devname='USB PnP Sound Device', rate=44100, frames_per_buffer=4096)
 
     def ioexp_cb(self, msg):
         if msg == 'BT0':
-            self.trigger_button_down.set()
             self.trigger_button = True
+            self.trigger_button_down.set()
             self.logger.debug("Trigger button down")
         elif msg == 'BT1':
-            self.trigger_button_up.set()
             self.trigger_button = False
+            self.trigger_button_up.set()
             self.logger.debug("Trigger button up")
         elif msg == 'dOK':
             pass
+        elif msg.startswith('C'):
+            for cb in self.ui_cbs:
+                try:
+                    cb(msg[1:])
+                except:
+                    pass
         else:
             self.logger.debug("RX: "+msg)
 
@@ -236,10 +253,16 @@ class PocketInferDemo(Board):
 
     def clear_screen(self):
         self.ioexp.ser.write('''
+        a0
         TT
         TB
         TS 
+        TM
+        tm
         '''.encode('utf-8'))
+
+    def led_animation(self, val):
+        return self.ioexp.transact(f'a{int(val)}')
 
     def statusbar(self, text):
         return self.ioexp.transact(f'TS{text}')
@@ -249,3 +272,9 @@ class PocketInferDemo(Board):
     
     def bottom_text(self, text):
         return self.ioexp.transact(f'TB{text}')
+
+    def mode_text(self, text):
+        return self.ioexp.transact(f'TM{text}')
+
+    def memory_text(self, text):
+        return self.ioexp.transact(f'Tm{text}')

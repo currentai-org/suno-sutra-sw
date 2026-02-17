@@ -23,6 +23,8 @@ import adafruit_ili9341
 from adafruit_neokey.neokey1x4 import NeoKey1x4
 import icons
 
+supervisor.runtime.autoreload = False
+
 led = digitalio.DigitalInOut(board.LED)
 led.direction = digitalio.Direction.OUTPUT
 butled = digitalio.DigitalInOut(board.D7)
@@ -87,18 +89,23 @@ modeval.anchored_position = (0, 3)
 topbar.append(modeval)
 
 # Create the text label
-battval = label.Label(icon_font, text=f"{icons.battery_full}   {icons.home}", color=color)
+battval = label.Label(icon_font, text=f"{icons.microchip}   {icons.battery_full}   {icons.home}", color=color)
 battval.anchor_point = (1.0, 0.0)
 battval.anchored_position = (320, 3)
 topbar.append(battval)
 
-toptext = text_box.TextBox(x=0, y=0, width=320, height=100, font=hindi_font, color=color)
+memval = label.Label(hindi_font, text="    ", color=color)
+memval.anchor_point = (1.0, 0.0)
+memval.anchored_position = (240, 8)
+topbar.append(memval)
+
+toptext = text_box.TextBox(x=0, y=0, width=320, height=100, line_spacing=0.80, font=hindi_font, color=color)
 toptext.anchor_point = (0.0, 0.0)
 toptext.anchored_position = (0, 16)
 appui.append(toptext)
 
 
-bottomtext = text_box.TextBox(x=0, y=100, width=320, height=100, font=hindi_font, color=color)
+bottomtext = text_box.TextBox(x=0, y=100, width=320, height=100, line_spacing=0.8, font=hindi_font, color=color)
 bottomtext.anchor_point = (0.0, 0.0)
 bottomtext.anchored_position = (0, 100)
 appui.append(bottomtext)
@@ -111,17 +118,17 @@ settingslabel.anchored_position = (160, 16)
 settingslabel.text = "Settings"
 setpage.append(settingslabel)
 
-settings_buttons = []
+settings_buttons = {}
 
-input_lang = label.Label(font, text="Input Lang ", color=color)
+input_lang = label.Label(font, text="ASR Lang ", color=color)
 input_lang.anchor_point = (0.0, 0.5)
 input_lang.anchored_position = (0, 48)
 setpage.append(input_lang)
 
-settings_buttons.append(Button(
+settings_buttons['ASR En'] = Button(
     x=64,
     y=32,
-    width=128,
+    width=64,
     height=32,
     label="ASR En",
     label_font=hindi_font,
@@ -130,12 +137,12 @@ settings_buttons.append(Button(
     outline_color=0x767676,
     selected_fill=0x1A1A1A,
     selected_outline=0x2E2E2E,
-))
+)
 
-settings_buttons.append(Button(
-    x=64+128,
+settings_buttons['ASR Hi'] = Button(
+    x=64+64,
     y=32,
-    width=128,
+    width=64,
     height=32,
     label="ASR Hi",
     label_font=hindi_font,
@@ -144,9 +151,101 @@ settings_buttons.append(Button(
     outline_color=0x767676,
     selected_fill=0x1A1A1A,
     selected_outline=0x2E2E2E,
-))
+)
 
-for but in settings_buttons:
+settings_buttons['ASR Ta'] = Button(
+    x=64+64*2,
+    y=32,
+    width=64,
+    height=32,
+    label="ASR Ta",
+    label_font=hindi_font,
+    label_color=0xFF7E00,
+    fill_color=0x5C5B5C,
+    outline_color=0x767676,
+    selected_fill=0x1A1A1A,
+    selected_outline=0x2E2E2E,
+)
+
+output_lang = label.Label(font, text="TTS Lang ", color=color)
+output_lang.anchor_point = (0.0, 0.5)
+output_lang.anchored_position = (0, 64+32/2)
+setpage.append(output_lang)
+
+settings_buttons['TTS En'] = Button(
+    x=64,
+    y=64,
+    width=64,
+    height=32,
+    label="TTS En",
+    label_font=hindi_font,
+    label_color=0xFF7E00,
+    fill_color=0x5C5B5C,
+    outline_color=0x767676,
+    selected_fill=0x1A1A1A,
+    selected_outline=0x2E2E2E,
+)
+
+settings_buttons['TTS Hi'] = Button(
+    x=64+64,
+    y=64,
+    width=64,
+    height=32,
+    label="TTS Hi",
+    label_font=hindi_font,
+    label_color=0xFF7E00,
+    fill_color=0x5C5B5C,
+    outline_color=0x767676,
+    selected_fill=0x1A1A1A,
+    selected_outline=0x2E2E2E,
+)
+
+settings_buttons['TTS Ta'] = Button(
+    x=64+64*2,
+    y=64,
+    width=64,
+    height=32,
+    label="TTS Ta",
+    label_font=hindi_font,
+    label_color=0xFF7E00,
+    fill_color=0x5C5B5C,
+    outline_color=0x767676,
+    selected_fill=0x1A1A1A,
+    selected_outline=0x2E2E2E,
+)
+
+settings_buttons['Reset'] = Button(
+    x=64,
+    y=192,
+    width=64,
+    height=32,
+    label="Reset",
+    label_font=hindi_font,
+    label_color=0xFF7E00,
+    fill_color=0x5C5B5C,
+    outline_color=0x767676,
+    selected_fill=0x1A1A1A,
+    selected_outline=0x2E2E2E,
+)
+
+settings_buttons['Reboot'] = Button(
+    x=64*2,
+    y=192,
+    width=64,
+    height=32,
+    label="Reboot",
+    label_font=hindi_font,
+    label_color=0xFF7E00,
+    fill_color=0x5C5B5C,
+    outline_color=0x767676,
+    selected_fill=0x1A1A1A,
+    selected_outline=0x2E2E2E,
+)
+
+settings_buttons['ASR En'].selected = True
+settings_buttons['TTS En'].selected = True
+
+for but in settings_buttons.values():
     setpage.append(but)
 
 setpage.hidden = True
@@ -161,7 +260,54 @@ last_trigger_button = False
 last_touched = False
 last_buttons = [False, False, False, False]
 
+def check_buttons(x, y):
+    for name in settings_buttons:
+        butt = settings_buttons[name]
+        if butt.selected:
+            continue
+        if butt.contains((x, y)):
+            names = list(settings_buttons.keys())
+            for other in filter(lambda x: x.startswith(name.split(' ')[0]), names):
+                settings_buttons[other].selected = False
+            if name == 'Reset' or name == 'Reboot':
+                setpage.hidden = True
+                appui.hidden = False
+                print('C'+name)
+                if name == 'Reboot':
+                    time.sleep(0.1)
+                    microcontroller.reset()
+            else:
+                butt.selected = True
+            print('C'+name)
+
+led_anim = 0
+led_anim_start = 0.0
+led_anim_speed = 3.0
+
+def run_led_anim():
+    global led_anim_start, led_anim_speed
+    offset = (time.monotonic() - led_anim_start) % led_anim_speed
+    if offset < led_anim_speed/4:
+        intensity = offset / (led_anim_speed/4)
+        neokey.pixels[0] = 0x0000FF * (1.0-intensity)
+        neokey.pixels[3] = 0x0000FF * (intensity)
+    elif offset < (led_anim_speed/4)*2:
+        intensity = (offset - (led_anim_speed/4)) / (led_anim_speed/4)
+        neokey.pixels[1] = 0x0000FF * (1.0-intensity)
+        neokey.pixels[0] = 0x0000FF * (intensity)
+    elif offset < (led_anim_speed/4)*3:
+        intensity = (offset - (led_anim_speed/4)*2) / (led_anim_speed/4)
+        neokey.pixels[2] = 0x0000FF * (1.0-intensity)
+        neokey.pixels[1] = 0x0000FF * (intensity)
+    else:
+        intensity = (offset - (led_anim_speed/4)*3) / (led_anim_speed/4)
+        neokey.pixels[3] = 0x0000FF * (1.0-intensity)
+        neokey.pixels[2] = 0x0000FF * (intensity)
+
+    
+
 def parse_msg(msg):
+    global led_anim, led_anim_start
     try:
         if msg is None or len(msg) < 1:
             return
@@ -190,11 +336,26 @@ def parse_msg(msg):
                 bottomtext.text = msg[2:].strip()
             elif msg[1] == 'M':
                 modeval.text = msg[2:].strip()
+            elif msg[1] == 'm':
+                memval.text = msg[2:].strip()
             else:
                 print(msg[0]+'Unk')
                 return
         elif msg == 'reboot':
             microcontroller.reset()
+        elif msg[0] == 'a':
+            led_anim_start = time.monotonic()
+            led_anim = int(msg[1:])
+            if led_anim == 0:
+                neokey.pixels[0] = 0
+                neokey.pixels[1] = 0
+                neokey.pixels[2] = 0
+                neokey.pixels[3] = 0
+            else:
+                neokey.pixels[0] = 0x0000FF
+                neokey.pixels[1] = 0x0000FF
+                neokey.pixels[2] = 0x0000FF
+                neokey.pixels[3] = 0x0000FF
         else:
             print(msg[0]+'Unk')
             return
@@ -236,10 +397,10 @@ try:
                 for touch in ts.touches:
                     y = 240-touch["x"]
                     x = touch["y"]
-                    print(f"t1,{x},{y}")
-            else:
-                print('t0')
+                    check_buttons(x, y)
             last_touched = ts.touched
+        if led_anim > 0:
+            run_led_anim()
         if ser.in_waiting:
             # Read all available bytes from serial port
             msg_buf += ser.read(ser.in_waiting)

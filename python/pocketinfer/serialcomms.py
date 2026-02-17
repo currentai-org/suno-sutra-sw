@@ -1,9 +1,13 @@
 import threading
 import serial
 import logging
+from os.path import exists
+from serial.tools import list_ports
 
 
 class IOInterface:
+    VID = 0x2886
+    PID = 0x0058
     def __init__(self, port='/dev/ttyACM0', baud=115200, debug=False):
         self.logger = logging.getLogger(__name__)
         self.port = port
@@ -28,7 +32,15 @@ class IOInterface:
             self.port = port
         if baud is not None:
             self.baud = baud
-        self.ser = serial.Serial(self.port, self.baud)
+        try:
+            self.ser = serial.Serial(self.port, self.baud)
+        except serial.serialutil.SerialException:
+            self.logger.info("Port not found, attempting autodetection")
+            for port in list_ports.comports():
+                if port.vid == self.VID and port.pid == self.PID:
+                    self.port = port.device
+                    break
+            self.ser = serial.Serial(self.port, self.baud)
         self.running = True
         self.thread = threading.Thread(target=self.reader)
         self.thread.daemon = True

@@ -25,10 +25,19 @@ class Tts:
             response = requests.get("http://localhost:11400/health")
             if response.status_code == 200:
                 return True, "TTS service is available."
-            else:
-                return False, f"TTS service responded with status code {response.status_code}."
-        except Exception as e:
-            return False, str(e)
+        except requests.exceptions.ConnectionError:
+            print("Connection Error, trying to launch model")
+        check_output('systemctl restart bhashini-models', shell=True)
+        start = time.time()
+        while time.time() - start < 10.0:
+            try:
+                response = requests.get("http://localhost:11400/health")
+                if response.status_code == 200:
+                    return True, "TTS service is available."
+            except requests.exceptions.ConnectionError:
+                pass
+            time.sleep(0.25)
+        return False, f"TTS service responded with status code {response.status_code}."
         
     @classmethod
     def update(cls, args):
