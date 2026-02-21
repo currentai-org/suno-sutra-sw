@@ -228,8 +228,22 @@ settings_buttons['Reset'] = Button(
     selected_outline=0x2E2E2E,
 )
 
-settings_buttons['Reboot'] = Button(
+settings_buttons['Shutdown'] = Button(
     x=64*2,
+    y=192,
+    width=64,
+    height=32,
+    label="Shutdown",
+    label_font=hindi_font,
+    label_color=0xFF7E00,
+    fill_color=0x5C5B5C,
+    outline_color=0x767676,
+    selected_fill=0x1A1A1A,
+    selected_outline=0x2E2E2E,
+)
+
+settings_buttons['Reboot'] = Button(
+    x=64*3,
     y=192,
     width=64,
     height=32,
@@ -269,7 +283,7 @@ def check_buttons(x, y):
             names = list(settings_buttons.keys())
             for other in filter(lambda x: x.startswith(name.split(' ')[0]), names):
                 settings_buttons[other].selected = False
-            if name == 'Reset' or name == 'Reboot':
+            if name == 'Reset' or name == 'Reboot' or name == 'Shutdown':
                 setpage.hidden = True
                 appui.hidden = False
                 print('C'+name)

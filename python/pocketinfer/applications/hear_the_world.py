@@ -69,6 +69,9 @@ class HearTheWorld(BaseApplication):
         elif msg == 'Reboot':
             self.logger.info('REbooting!')
             check_output('reboot', shell=True)
+        elif msg == 'Shutdown':
+            self.logger.info('Shutdown!')
+            check_output('halt', shell=True)
         elif msg.startswith('ASR'):
             self.settings['input_language'] = msg[4:].lower()
         elif msg.startswith('TTS'):
