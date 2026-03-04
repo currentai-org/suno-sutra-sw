@@ -3,4 +3,4 @@
   roles:
     - { role: vllm, tags: ['initial'] }
     - { role: indic, tags: ['initial'] }
-    - { role: english, tags: ['initial'] }
+    - { role: app, tags: ['initial'] }

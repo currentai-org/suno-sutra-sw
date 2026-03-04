@@ -15,15 +15,16 @@
     - libportaudio2
     - ffmpeg
     - flac
-
   become: true
+
+- name: Copy root application code
+  copy:
+    src: "{{ playbook_dir }}/.."
+    dest: ~/
+
 - name: Install global python dependencies
   ansible.builtin.pip:
-    name:
-      - pyaudio
-      - vosk
-      - piper-tts
-      - SpeechRecognition
-      - ollama
-  become: true
+    requirements: ~/pocket-infer-sw/python/requirements.txt
+    virtualenv: ~/pocket-infer-sw/python/venv
+    virtualenv_site_packages: yes
     
