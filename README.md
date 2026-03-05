@@ -4,7 +4,7 @@ This repository contains all of the software required to prepare and operate a S
 
 At it's core, Suno Sutra is an embedded linux device with application code running in Python. The python module can be used to describe applications that communicate with the UI (screen, buttons, microphone, speaker) and run AI inference on an array of supported models. Since this is an embedded linux project, users can also simply shell into the device and install whatever software they like. However the application framework aims to simplify and streamline development. Break free from it if you like!
 
-<a href="./assets/SunoSutra High-level Software Architecture.png"><img src="./assets/SunoSutra High-level Software Architecture.png" width="50%"></img></a>
+<a href="./assets/SunoSutra High-level Software Architecture.png"><img src="./assets/SunoSutra High-level Software Architecture.png" width="80%"></img></a>
 
 # Software Components / Navigation
 
