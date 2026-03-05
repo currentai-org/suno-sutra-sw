@@ -1,7 +1,7 @@
 # IO Expander
 
 ## Overview
-This is a CircuitPythonproject for a Seeeduino XIAO RP2350 microcontroller. This codebase was last tested on v10.0.3, but any v10.x firmware should work.
+This is a CircuitPython project for a Seeeduino XIAO RP2350 microcontroller. This codebase was last tested on v10.0.3, but any v10.x firmware should work.
 
 The IO Expander is a component of the original Suno Sutra prototype. This component is necessary when using the original Seeeedstudio ReComputer Mini carrier board, because it does not expose enough level-shifted GPIO lines to run the Suno Sutra project. Instead of adding an extension board to the carrier, or designing our own custom carrier, we opted to add this IO expander to the project to work around the issue.
 
@@ -62,4 +62,4 @@ Note also that some messages will be spotaneously emitted by the IO Expander in 
 
 ### Debugging
 
-Connect to the USB CDC port using a serial console application to monitor prograp output and  
+Connect to the USB CDC port using a serial console application to monitor program output. When modifications are made to code.py, the program can be reloaded by pressing `Ctrl-D` in the serial console. `Ctrl-C` can be pressed to pause program execution and enter the Python REPL. 

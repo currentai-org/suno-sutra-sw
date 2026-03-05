@@ -1,15 +1,18 @@
 # Suno Sutra Software
 
-This repository contains all of the software required to prepare and operate a Suno Sutra pocket inference device. At it's core, Suno Sutra is an embedded linux device with application code running in Python. The python module can be used to describe applications that communicate with the UI (screen, buttons, microphone, speaker) and run AI inference on an array of supported models.
+This repository contains all of the software required to prepare and operate a Suno Sutra pocket inference device. Suno Sutra is an open platform for running local AI inference at the edge. This software project can be used to quickly develop an application that takes audiovisual input from the world and runs it through one or more AI models.
 
-Contained within are:
-* Scripts for creating and updating the [Root File System (rootfs)](./rootfs/)
-    * These scripts can also be used to install models and other dependencies
-* [Python classes](./python/) that enable communication with hardware
+At it's core, Suno Sutra is an embedded linux device with application code running in Python. The python module can be used to describe applications that communicate with the UI (screen, buttons, microphone, speaker) and run AI inference on an array of supported models. Since this is an embedded linux project, users can also simply shell into the device and install whatever software they like. However the application framework aims to simplify and streamline development. Break free from it if you like!
+
+<a href="./assets/SunoSutra High-level Software Architecture.png"><img src="./assets/SunoSutra High-level Software Architecture.png" width="50%"></img></a>
+
+# Software Components / Navigation
+
+* [rootfs](./rootfs/) For information about how to prepare a Root Filesystem image, to install dependencies or update dependencies.
+* [python](./python/) For information about the python library, which includes the Hardware Abstraction Layer (HAL), application templates and registry, model wrappers, application code and service.
 * [Python templates](./python/pocketinfer/applications/) for defining applications to run on device
 * A [Python service](./python/pocketinfer/service.py) that can serve applications on the device
-
-Since this is an embedded linux project, users can also simply shell into the device and install whatever software they like. However the application framework aims to simplify and streamline development. Break free from it if you like!
+* [ioexpander](./ioexpander/) firmware relating to the IO Expander component.
 
 ## Development Quickstart
 
@@ -26,6 +29,8 @@ The easiest way to get up and running is to SSH into the device by executing `ss
 * Execute `sudo systemctl restart pocketinfer && journalctl -f -u pocketinfer` to restart the system service and view live logs. Use the device UI to activate the new application, and then watch the terminal 
 
 ## Hardware / Software Support
+
+Suno Sutra was originally developed for the NVIDIA Jetson Orin Nano 8GB module, on Jetpack 6.2. However this project aims to be flexible to the underlying platform and support may be added for more platforms in the future. Here's the current status:
 
 Platform:
 * NVIDIA Jetson / Jetpack 6.2: Fully Supported
@@ -45,12 +50,6 @@ Motherboard / Carrier Board / Development Board:
 * NVIDIA Orin Nano 8GB Super Development Kit: Fully Supported
 * Seeeedstudio ReComputer Mini Carrier Board: Fully Supported
 * Waveshare NVIDIA Orin NX 16GB Development Kit: In Progress
-
-# Software Components / Navigation
-
-* For information about how to prepare a Root Filesystem image, to install dependencies or update dependencies, see the [rootfs](./rootfs/) subfolder.
-* For information about the python library, which includes the Hardware Abstraction Layer (HAL), application templates and registry, model wrappers, application code and service, see the [python](./python/) subfolder.
-* For firmware relating to the IO Expander component, see the [ioexpander](./ioexpander/) subfolder.
 
 # Contribution / Development Tips
 
