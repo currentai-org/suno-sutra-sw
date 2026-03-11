@@ -6,6 +6,8 @@ Provisioning will be done with Ansible. Ansible is the only pre-requisite - in t
 
 ## NVIDIA Jetson
 
+For step-by-step flashing instructions, see [Jetson_Flash](./Jetson_Flash.md)
+
 The rootfs is built upon nvidia jetpack v6.2.1, installed to a device using nvidia sdk-manager. 
 Sdk-manager should have flashed the device pre-configured with username "ubuntu" and password "ubuntu". It's strongly recommended to do this before flashing the device - otherwise you may need to connect an HDMI monitor and keyboard to the device in order to complete first-boot configuration.
 
@@ -15,4 +17,3 @@ After flashing, as long as the pre-configuration was successful, the device shou
 
 Once the device comes online after flashing and enumerates as an RNDIS network interface, it's recommended to get the device connected to a wireless network with internet access. This is only needed for the initial provisonining and model updates. SSH to the device with `ssh ubuntu@192.168.55.1` and password ubuntu, then execute `nmcli device wifi connect <ssid> password <password>`
 
-Finally, dependencies for this project can be installed using Ansible. First ensure the `ansible-core` package is installed. Then execute `ansible-playbook -i inventory ./install_all_usb.yml` from the host machine to provision the device.

@@ -19,12 +19,12 @@
   shell: systemctl set-default multi-user
   become: true
 
-# Needed for seeedstudio carrier board:
-# The nvidia-l4t-bootloader cannot be updated on custom hardware
-# And it's a dependency for several other packages
-- name: Prepare for apt upgrade
-  shell: sudo apt-mark hold nvidia-l4t-bootloader nvidia-l4t-display-kernel nvidia-l4t-kernel nvidia-l4t-kernel-dtbs nvidia-l4t-kernel-headers nvidia-l4t-kernel-oot-headers nvidia-l4t-kernel-oot-modules
-  become: true
+# # Needed for seeedstudio carrier board:
+# # The nvidia-l4t-bootloader cannot be updated on custom hardware
+# # And it's a dependency for several other packages
+# - name: Prepare for apt upgrade
+#   shell: sudo apt-mark hold nvidia-l4t-bootloader nvidia-l4t-display-kernel nvidia-l4t-kernel nvidia-l4t-kernel-dtbs nvidia-l4t-kernel-headers nvidia-l4t-kernel-oot-headers nvidia-l4t-kernel-oot-modules
+#   become: true
 
 # May be needed for carrier board
 - name: Ensure all Jetpack SDK components are installed
@@ -92,11 +92,12 @@
       - Jetson.GPIO==2.1.12
   become: true
 
-- name: Install pytorch
-  ansible.builtin.pip:
-    name:
-      - torch==2.8.0
-      - torchvision==0.23.0
-      - torchaudio==2.8.0
-    extra_args: --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
-  become: true
+# - name: Install pytorch
+#   ansible.builtin.pip:
+#     name:
+#       - torch==2.8.0
+#       - torchvision==0.23.0
+#       - torchaudio==2.8.0
+#     extra_args: --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
+#   become: true
+# 

@@ -18,9 +18,22 @@
   become: true
 
 - name: Copy root application code
-  copy:
-    src: "{{ playbook_dir }}/.."
-    dest: ~/
+  ansible.builtin.synchronize:
+    src: "{{ playbook_dir }}/../python"
+    dest: ~/pocket-infer-sw
+    delete: no
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=venv"
+
+- name: Copy IO Expander Code
+  ansible.builtin.synchronize:
+    src: "{{ playbook_dir }}/../ioexpander"
+    dest: ~/ioexpander
+    delete: no
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=venv"
 
 - name: Install global python dependencies
   ansible.builtin.pip:
