@@ -29,7 +29,7 @@
 - name: Copy IO Expander Code
   ansible.builtin.synchronize:
     src: "{{ playbook_dir }}/../ioexpander"
-    dest: ~/ioexpander
+    dest: ~/pocket-infer-sw
     delete: no
     rsync_opts:
       - "--exclude=.git"
