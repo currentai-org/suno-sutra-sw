@@ -1,4 +1,5 @@
 from os.path import exists
+from os import system
 from subprocess import run
 from pocketinfer.serialcomms import IOInterface
 import threading
@@ -124,6 +125,34 @@ class Board:
             return PocketInferDemo(args)
         raise NotImplementedError('Unsupported Carrier Board: '+carrier_ver.decode('utf-8'))
 
+    # To be overridden, ideally
+    def button_led(self, value):
+        return True
+        
+    def rgb_led(self, r, g=None, b=None):
+        return True
+
+    def led_animation(self, val):
+        return True
+
+    def clear_screen(self):
+        return
+
+    def statusbar(self, text):
+        return True
+
+    def top_text(self, text):
+        return True
+    
+    def bottom_text(self, text):
+        return True
+
+    def mode_text(self, text):
+        return True
+
+    def memory_text(self, text):
+        return True
+
 class DummyBoard(Board):
     def __init__(self, args):
         super().__init__(args)
@@ -149,32 +178,24 @@ class DummyBoard(Board):
         if isinstance(img, bytes):
             return cv2.imdecode(img, cv2.IMREAD_COLOR)
         return img
-
-    def button_led(self, value):
-        return True
-        
-    def rgb_led(self, r, g=None, b=None):
-        return True
-
-    def clear_screen(self):
-        return
-
-    def statusbar(self, text):
-        return True
-
-    def top_text(self, text):
-        return True
-    
-    def bottom_text(self, text):
-        return True
     
 
 class PocketInferDevboard(Board):
+    ALSA_PLAYBACK_DEVICE = "hw:2,0"
+    ALSA_PLAYBACK_CARD = 2
+    ALSA_CAPTURE_CARD = 1
     CV2_INDEX = 0
-    pass
+
+    def __init__(self, args):
+        super().__init__(args)
+        self.audio = audio.AudioRecorder(devname='USB PnP Sound Device', rate=44100, frames_per_buffer=4096)
+        system(f'amixer -c {self.ALSA_CAPTURE_CARD} sset Mic 100% > /dev/null')
+        system(f'amixer -c {self.ALSA_PLAYBACK_CARD} sset Speaker 100% > /dev/null')
 
 class PocketInferDemo(Board):
     ALSA_PLAYBACK_DEVICE = "hw:2,0"
+    ALSA_PLAYBACK_CARD = 2
+    ALSA_CAPTURE_CARD = 1
     CV2_INDEX = 0
 
     def __init__(self, args):
@@ -185,6 +206,8 @@ class PocketInferDemo(Board):
         self.clear_screen()
         self.statusbar("Loading...")
         self.audio = audio.AudioRecorder(devname='USB PnP Sound Device', rate=44100, frames_per_buffer=4096)
+        system(f'amixer -c {self.ALSA_CAPTURE_CARD} sset Mic 100% > /dev/null')
+        system(f'amixer -c {self.ALSA_PLAYBACK_CARD} sset Speaker 100% > /dev/null')
 
     def ioexp_cb(self, msg):
         if msg == 'BT0':

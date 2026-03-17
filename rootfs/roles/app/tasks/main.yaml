@@ -1,5 +1,6 @@
 ---
 - name: Install onnxruntime-gpu 
+  tags: [always]
   ansible.builtin.pip:
     name:
       - onnxruntime
@@ -8,6 +9,7 @@
   become: true
 
 - name: Install additional deps
+  tags: [always]
   ansible.builtin.apt:
     pkg:
     - libasound-dev
@@ -18,6 +20,7 @@
   become: true
 
 - name: Copy root application code
+  tags: [always]
   ansible.builtin.synchronize:
     src: "{{ playbook_dir }}/../python"
     dest: ~/pocket-infer-sw
@@ -27,6 +30,7 @@
       - "--exclude=venv"
 
 - name: Copy IO Expander Code
+  tags: [demo]
   ansible.builtin.synchronize:
     src: "{{ playbook_dir }}/../ioexpander"
     dest: ~/pocket-infer-sw
@@ -36,6 +40,7 @@
       - "--exclude=venv"
 
 - name: Install global python dependencies
+  tags: [always]
   ansible.builtin.pip:
     requirements: ~/pocket-infer-sw/python/requirements.txt
     virtualenv: ~/pocket-infer-sw/python/venv

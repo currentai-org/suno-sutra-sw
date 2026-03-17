@@ -7,3 +7,4 @@ vosk
 piper-tts
 appdirs
 opencv-python
+psutil

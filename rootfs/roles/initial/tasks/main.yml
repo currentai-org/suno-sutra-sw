@@ -1,68 +1,76 @@
 ---
 - name: Collect serial-number
+  tags: [always]
   shell: cat /proc/device-tree/serial-number
   register: serial
 
 - name: Collect hostname
+  tags: [always]
   command: python -c 'f=open("/proc/device-tree/serial-number");val=f.read();f.close();print("pocket-infer-"+hex(int(val.rstrip("\x00")))[-4:])'
   register: hostname 
 
 - name: Set Hostname
+  tags: [always]
   shell: "hostname {{ hostname.stdout }}"
   become: true
 
 - name: Store hostname
+  tags: [always]
   shell: "echo '{{ hostname.stdout }}' > /etc/hostname"
   become: true
 
 - name: Disable GUI session
+  tags: [always]
   shell: systemctl set-default multi-user
   become: true
 
-# # Needed for seeedstudio carrier board:
-# # The nvidia-l4t-bootloader cannot be updated on custom hardware
-# # And it's a dependency for several other packages
-# - name: Prepare for apt upgrade
-#   shell: sudo apt-mark hold nvidia-l4t-bootloader nvidia-l4t-display-kernel nvidia-l4t-kernel nvidia-l4t-kernel-dtbs nvidia-l4t-kernel-headers nvidia-l4t-kernel-oot-headers nvidia-l4t-kernel-oot-modules
-#   become: true
+# Needed for seeedstudio carrier board:
+# The nvidia-l4t-bootloader cannot be updated on custom hardware
+# And it's a dependency for several other packages
+- name: Prepare for apt upgrade
+  tags: [demo]
+  shell: sudo apt-mark hold nvidia-l4t-bootloader nvidia-l4t-display-kernel nvidia-l4t-kernel nvidia-l4t-kernel-dtbs nvidia-l4t-kernel-headers nvidia-l4t-kernel-oot-headers nvidia-l4t-kernel-oot-modules
+  become: true
 
 # May be needed for carrier board
 - name: Ensure all Jetpack SDK components are installed
+  tags: [always]
   shell: apt update && apt install -y nvidia-jetpack
   become: true
 
 - name: Ensure Docker is installed
+  tags: [always]
   ansible.builtin.shell:
     cmd: "curl https://get.docker.com | sh"
     creates: "/usr/bin/docker" # Skip if this file exists
 
 - name: Set docker user
+  tags: [always]
   shell: usermod -aG docker $USER
   become: true
 
 - name: Copy cuda-keyring deb file
+  tags: [always]
   copy:
     src: cuda-keyring_1.1-1_all.deb
     dest: /tmp/cuda-keyring_1.1-1_all.deb
 
 - name: Install the cuda-keyring deb
+  tags: [always]
   ansible.builtin.apt:
     deb: /tmp/cuda-keyring_1.1-1_all.deb
     state: present
   become: true
 
 - name: Update and upgrade all apt packages
+  tags: [always]
   ansible.builtin.apt:
     update_cache: yes
     upgrade: yes
   become: true # Required for apt operations
 
-- name: Gather package facts
-  ansible.builtin.package_facts:
-    manager: apt # Specify 'apt' for Debian-based systems
-  register: package_facts_result
-
 - name: Install pytorch dependencies
+  tags: [always]
   ansible.builtin.apt:
     pkg:
     - nvidia-jetpack
@@ -75,6 +83,7 @@
   become: true
 
 - name: Install project apt dependencies
+  tags: [always]
   ansible.builtin.apt:
     pkg:
     - v4l-utils
@@ -82,10 +91,12 @@
     - virtualenv
     - python3-pip
     - python3-setuptools
+    - python3-venv
     - ffmpeg
   become: true
 
 - name: Install global python dependencies
+  tags: [always]
   ansible.builtin.pip:
     name:
       - jetson-stats==4.3.2

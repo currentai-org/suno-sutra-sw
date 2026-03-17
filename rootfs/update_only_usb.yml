@@ -1,6 +1,4 @@
 ---
 - hosts: usb
   roles:
-    - { role: vllm, tags: ['initial'] }
-    - { role: indic, tags: ['initial'] }
     - { role: app, tags: ['initial'] }
