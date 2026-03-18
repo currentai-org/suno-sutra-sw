@@ -6,7 +6,10 @@ import threading
 import logging
 import cv2
 import wave
+import time
 from pocketinfer import audio
+
+import Jetson.GPIO as GPIO
 
 
 class CameraIterable:
@@ -139,15 +142,19 @@ class Board:
         return
 
     def statusbar(self, text):
+        self.logger.info("Statusbar: "+text)
         return True
 
     def top_text(self, text):
+        self.logger.info("Top text: "+text)
         return True
     
     def bottom_text(self, text):
+        self.logger.info("Bottom text: "+text)
         return True
 
     def mode_text(self, text):
+        self.logger.info("Mode text: "+text)
         return True
 
     def memory_text(self, text):
@@ -185,12 +192,28 @@ class PocketInferDevboard(Board):
     ALSA_PLAYBACK_CARD = 2
     ALSA_CAPTURE_CARD = 1
     CV2_INDEX = 0
+    TRIGGER_BOARD_IDX = 7
 
     def __init__(self, args):
         super().__init__(args)
         self.audio = audio.AudioRecorder(devname='USB PnP Sound Device', rate=44100, frames_per_buffer=4096)
         system(f'amixer -c {self.ALSA_CAPTURE_CARD} sset Mic 100% > /dev/null')
         system(f'amixer -c {self.ALSA_PLAYBACK_CARD} sset Speaker 100% > /dev/null')
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(self.TRIGGER_BOARD_IDX, GPIO.IN)
+        GPIO.add_event_detect(self.TRIGGER_BOARD_IDX, GPIO.BOTH, callback=self.trig_cb, bouncetime=100)
+
+    def trig_cb(self, channel):
+        if GPIO.input(self.TRIGGER_BOARD_IDX):
+            self.trigger_button = True
+            self.trigger_button_down.set()
+            self.logger.debug("Trigger button down")
+        else:
+            self.trigger_button = False
+            self.trigger_button_up.set()
+            self.logger.debug("Trigger button up")
+
+
 
 class PocketInferDemo(Board):
     ALSA_PLAYBACK_DEVICE = "hw:2,0"

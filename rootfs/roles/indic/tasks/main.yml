@@ -62,48 +62,61 @@
     name: /tmp/ctranslate2-4.6.3-cp310-cp310-linux_aarch64.whl
     state: present
 
-# # Unpack
-# - name: Extract ASR model from local archive
-#   ansible.builtin.unarchive:
-#     src: ASR-Hindi-CPUquantized.zip
-#     dest: ~/
-# 
-# - name: Strip torch dependencies from requirements
-#   shell: sed -i '/.*torch.*/d' ~/static_asr_inference/requirements.txt
-# 
-# - name: Install ASR python dependencies
-#   ansible.builtin.pip:
-#     requirements: ~/static_asr_inference/requirements.txt
-#     virtualenv: ~/static_asr_inference/venv
-#     virtualenv_site_packages: yes
-# 
-# - name: Force numpy compatibility
-#   ansible.builtin.pip:
-#     name: numpy<2
-#     virtualenv: ~/static_asr_inference/venv
-#     virtualenv_site_packages: yes
-# 
-# # Unpack
-# - name: Extract NMT model from local archive
-#   ansible.builtin.unarchive:
-#     src: nmt_trans.zip
-#     dest: ~/
-# 
-# - name: Strip torch dependencies from requirements
-#   shell: sed -i '/.*torch.*/d' ~/ctranslate2_inference/requiremennts.txt
-# 
-# - name: Strip ctranslate from requirements
-#   shell: sed -i '/.*ctranslate2.*/d' ~/ctranslate2_inference/requiremennts.txt
-# 
-# - name: Install NMT python dependencies
-#   ansible.builtin.pip:
-#     requirements: ~/ctranslate2_inference/requiremennts.txt
-#     virtualenv: ~/ctranslate2_inference/venv
-#     virtualenv_site_packages: yes
-# 
-# - name: Force numpy compatibility
-#   ansible.builtin.pip:
-#     name: numpy<2
-#     virtualenv: ~/ctranslate2_inference/venv
-#     virtualenv_site_packages: yes
-# 
+# ---- Bhashini Models -----
+- name: Extract bhashini models from local archive
+  ansible.builtin.unarchive:
+    src: bhashini_models.zip
+    dest: ~/
+
+- name: Install ASR python dependencies
+  ansible.builtin.pip:
+    requirements: ~/bhashini_models/requirements.txt
+    extra_args: --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
+    virtualenv: ~/bhashini_models/venv
+    virtualenv_site_packages: yes
+
+- name: Force numpy compatibility
+  ansible.builtin.pip:
+    name: numpy<2
+    virtualenv: ~/bhashini_models/venv
+    virtualenv_site_packages: yes
+
+- name: Clone Flite repository
+  ansible.builtin.git:
+    repo: http://github.com/festvox/flite
+    dest: ~/bhashini_models/tts/flite
+
+- name: Configure Flite
+  shell: ./configure
+  args:
+    chdir: ~/bhashini_models/tts/flite
+
+- name: Build Flite
+  shell: make
+  args:
+    chdir: ~/bhashini_models/tts/flite
+
+- name: Download default voices
+  shell: make get_voices
+  args:
+    chdir: ~/bhashini_models/tts/flite
+
+- name: Download Indic voices
+  shell: ./bin/get_voices indic_voices
+  args:
+    chdir: ~/bhashini_models/tts/flite
+
+- name: Install Service
+  ansible.builtin.copy:
+    src: /home/ubuntu/bhashini_models/bhashini_models.service
+    dest: /etc/systemd/system/bhashini_models.service
+    remote_src: true
+  become: true
+
+- name: Enable and start Service
+  ansible.builtin.systemd:
+    name: bhashini_models.service
+    daemon_reload: true
+    enabled: true
+    state: started
+  become: true

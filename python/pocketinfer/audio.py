@@ -6,6 +6,7 @@ import threading
 import numpy as np
 import shutil
 import subprocess
+import logging 
 from typing import Optional
 from speech_recognition import AudioData
 from contextlib import contextmanager
@@ -28,6 +29,7 @@ def noalsaerr():
 
 class AudioRecorder:
     def __init__(self, device_idx=0, devname=None, rate=16000, channels=1, frames_per_buffer=1024):
+        self.logger = logging.getLogger(__name__)
         self.rate = rate
         self.channels = channels
         self.frames_per_buffer = frames_per_buffer
@@ -46,6 +48,7 @@ class AudioRecorder:
         self.recording = False
 
     def start(self):
+        self.logger.debug('Opening device index %s for recording', self.device_idx)
         self.stream = self.p.open(format=pyaudio.paInt16,
                                   channels=self.channels,
                                   rate=self.rate,
@@ -64,19 +67,24 @@ class AudioRecorder:
         try:
             while self.recording:
                 data = self.stream.read(self.frames_per_buffer)
+                self.logger.debug(f'Read {len(data)} bytes from audio stream, {len(self.frames)} frames collected so far')
                 self.frames.append(data)
         finally:
             self.recording = False
+        self.logger.debug("Audio recording thread exiting")
 
 
     def stop(self):
+        self.logger.debug('Stopping audio recording')
         self.recording = False
         time.sleep(0.15) # Experimentlaly determined to allow last buffer to be read
         self.thread.join()
         if self.stream is not None:
+            self.logger.debug("Closing audio stream")
             self.stream.stop_stream()
             self.stream.close()
             self.stream = None
+        self.logger.debug("Shutdown complete")
 
     def save_to_file(self, filename):
         wf = wave.open(filename, 'wb')

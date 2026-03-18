@@ -21,12 +21,15 @@ class BaseApplication:
 
     def _run(self):
         self.logger.info("Startup")
-        try:
-            self.run()
-        except KeyboardInterrupt:
-            self.logger.info("Exit")
-            self.board.clear_screen()
-            self.running = False
+        while self.running:
+            try:
+                self.run()
+            except KeyboardInterrupt:
+                self.logger.info("Exit")
+                self.board.clear_screen()
+                self.running = False
+            except Exception as e:
+                self.logger.exception("Error in application run loop: %s", e)
 
     def run(self):
         raise NotImplementedError()
