@@ -27,6 +27,14 @@ def noalsaerr():
     yield
     asound.snd_lib_error_set_handler(None)
 
+def find_card_by_name(devname):
+    p = pyaudio.PyAudio()
+    for i in range(p.get_device_count()):
+        devinfo = p.get_device_info_by_index(i)
+        if devname in devinfo['name']:
+            return i
+    return None
+
 class AudioRecorder:
     def __init__(self, device_idx=0, devname=None, rate=16000, channels=1, frames_per_buffer=1024):
         self.logger = logging.getLogger(__name__)
@@ -37,11 +45,9 @@ class AudioRecorder:
             self.p = pyaudio.PyAudio()
         self.device_idx = device_idx,
         if devname is not None:
-            for i in range(self.p.get_device_count()):
-                devinfo = self.p.get_device_info_by_index(i)
-                if devname in devinfo['name']:
-                    self.device_idx = i
-                    break
+            newidx = find_card_by_name(devname)
+            if newidx is not None:
+                self.device_idx = newidx
         self.stream = None
         self.frames = []
         self.thread = threading.Thread()

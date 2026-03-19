@@ -2,11 +2,13 @@ from os.path import exists
 from os import system
 from subprocess import run
 from pocketinfer.serialcomms import IOInterface
+from glob import glob
 import threading
 import logging
 import cv2
 import wave
 import time
+import re
 from pocketinfer import audio
 
 import Jetson.GPIO as GPIO
@@ -24,8 +26,13 @@ class CameraIterable:
         return frame
 
 class CameraReader:
-    def __init__(self, camera_index):
-        self.camera_index = camera_index
+    def __init__(self, camera_name='', camera_interface='usb', width=1280, height=720):
+        self.logger = logging.getLogger(__name__)
+        self.camera_name = camera_name
+        self.camera_interface = camera_interface
+        self.camera_idx = None
+        self.width = width
+        self.height = height
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.frame = None
         self.running = False
@@ -36,9 +43,22 @@ class CameraReader:
         self.thread.start()
     
     def _run(self):
-        self.cap = cv2.VideoCapture(self.camera_index)
+        for filename in glob('/dev/v4l/by-id/*'):
+            try:
+                interface, name, idx = re.match(r'(\S+)\-(\S+)\-\S+\-index(\d+)', filename).groups()
+                if self.camera_interface in interface and self.camera_name in name:
+                    self.camera_idx = int(idx)
+                    break
+            except AttributeError:
+                continue
+        if self.camera_idx is None:
+            self.logger.warning(f"Camera '{self.camera_name}' with interface '{self.camera_interface}' not found, defaulting to index 0")
+            self.camera_idx = 0
+        self.cap = cv2.VideoCapture(self.camera_idx)
         if not self.cap.isOpened():
-            raise RuntimeError(f"Unable to open VideoCapture({self.camera_index})")
+            raise RuntimeError(f"Unable to open VideoCapture({self.camera_idx})")
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
         try:
             while self.running:
                 ret, frame = self.cap.read()
@@ -56,8 +76,11 @@ class CameraReader:
         self.cap.release()
 
 class Board:
-    CV2_INDEX = None
-    ALSA_PLAYBACK_DEVICE = "default"
+    V4L_CAMERA_NAME = ''
+    V4L_CAMERA_INTERFACE = 'usb'
+    ALSA_CAPTURE_NAME = ''
+    ALSA_PLAYBACK_NAME = ''
+    ALSA_CAPTURE_RATE = 16000
 
     def __init__(self, args):
         self.logger = logging.getLogger(__name__)
@@ -65,7 +88,17 @@ class Board:
         self.trigger_button = False
         self.trigger_button_down = threading.Event()
         self.trigger_button_up = threading.Event()
-        self.camera = CameraReader(self.CV2_INDEX)
+        self.camera = CameraReader(
+            camera_name=self.V4L_CAMERA_NAME,
+            camera_interface=self.V4L_CAMERA_INTERFACE
+        )
+        self.audio = audio.AudioRecorder(devname=self.ALSA_CAPTURE_NAME, rate=self.ALSA_CAPTURE_RATE, frames_per_buffer=4096)
+        self.ALSA_CAPTURE_CARD = audio.find_card_by_name(self.ALSA_CAPTURE_NAME)
+        self.ALSA_PLAYBACK_CARD = audio.find_card_by_name(self.ALSA_PLAYBACK_NAME)
+        self.ALSA_PLAYBACK_DEVICE = f'hw:{self.ALSA_PLAYBACK_CARD},0'
+        self.logger.debug('Detected ALSA capture card index: %s, Detected ALSA playback card index: %s', self.ALSA_CAPTURE_CARD, self.ALSA_PLAYBACK_CARD)
+        system(f'amixer -c {self.ALSA_CAPTURE_CARD} sset Mic 100% > /dev/null')
+        system(f'amixer -c {self.ALSA_PLAYBACK_CARD} sset Speaker 100% > /dev/null')
         self.ui_cbs = []
 
     def subscribe_to_ui(self, func):
@@ -188,17 +221,13 @@ class DummyBoard(Board):
     
 
 class PocketInferDevboard(Board):
-    ALSA_PLAYBACK_DEVICE = "hw:2,0"
-    ALSA_PLAYBACK_CARD = 2
-    ALSA_CAPTURE_CARD = 1
-    CV2_INDEX = 0
+    V4L_CAMERA_NAME = 'Arducam_8mp'
+    ALSA_CAPTURE_NAME = 'Arducam_8mp'
+    ALSA_PLAYBACK_NAME = 'USB Audio Device'
     TRIGGER_BOARD_IDX = 7
 
     def __init__(self, args):
         super().__init__(args)
-        self.audio = audio.AudioRecorder(devname='USB PnP Sound Device', rate=44100, frames_per_buffer=4096)
-        system(f'amixer -c {self.ALSA_CAPTURE_CARD} sset Mic 100% > /dev/null')
-        system(f'amixer -c {self.ALSA_PLAYBACK_CARD} sset Speaker 100% > /dev/null')
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(self.TRIGGER_BOARD_IDX, GPIO.IN)
         GPIO.add_event_detect(self.TRIGGER_BOARD_IDX, GPIO.BOTH, callback=self.trig_cb, bouncetime=100)
@@ -216,10 +245,10 @@ class PocketInferDevboard(Board):
 
 
 class PocketInferDemo(Board):
-    ALSA_PLAYBACK_DEVICE = "hw:2,0"
-    ALSA_PLAYBACK_CARD = 2
-    ALSA_CAPTURE_CARD = 1
-    CV2_INDEX = 0
+    V4L_CAMERA_NAME = 'Arducam_8mp'
+    ALSA_CAPTURE_NAME = 'USB PnP Sound Device'
+    ALSA_CAPTURE_RATE = 44100
+    ALSA_PLAYBACK_NAME = 'USB Audio Device'
 
     def __init__(self, args):
         super().__init__(args)
@@ -228,9 +257,6 @@ class PocketInferDemo(Board):
         self.ioexp.open()
         self.clear_screen()
         self.statusbar("Loading...")
-        self.audio = audio.AudioRecorder(devname='USB PnP Sound Device', rate=44100, frames_per_buffer=4096)
-        system(f'amixer -c {self.ALSA_CAPTURE_CARD} sset Mic 100% > /dev/null')
-        system(f'amixer -c {self.ALSA_PLAYBACK_CARD} sset Speaker 100% > /dev/null')
 
     def ioexp_cb(self, msg):
         if msg == 'BT0':

@@ -6,9 +6,11 @@ import importlib
 class BaseApplication:
     METADATA = {} # Will be overridden by ApplicationRegistry decorator
 
-    def __init__(self, board):
+    def __init__(self, board, settings=None):
         self.logger = logging.getLogger(__name__)
         self.settings = self.METADATA.get("default_settings", {})
+        if settings is not None:
+            self.settings.update(settings)
         self.board = board
         self.thread = threading.Thread()
         self.running = False

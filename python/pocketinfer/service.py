@@ -24,6 +24,8 @@ def main():
     parser.add_argument('--dummy-board', action='store_true', default=False, help='Do not use hardware features - load audio and image from file')
     parser.add_argument('--audio-file', type=str, help='Path to 16kHz 16-bit wav file to use with dummy board')
     parser.add_argument('--image-file', type=str, help='Path to image file to use with dummy board')
+    parser.add_argument('--settings-file', default=None, type=str, help='Path to JSON file with application settings to override defaults')
+    parser.add_argument('--setting', type=str, action='append', help='Override a specific application setting (can be used multiple times, e.g. --setting input_language=hi --setting output_language=en)')
     args = parser.parse_args()
     # Temporary code to test application startup
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
@@ -43,6 +45,22 @@ def main():
         app_cls.update_dependencies()
         sys.exit(0)
 
+    settings = {}
+    if args.settings_file:
+        with open(args.settings_file, 'r') as f:
+            file_settings = json.load(f)
+        if not isinstance(file_settings, dict):
+            logging.error("Settings file must contain a JSON object (dictionary) at the top level")
+            sys.exit(1)
+        settings.update(file_settings)
+
+    for setting_str in args.setting:
+        if '=' not in setting_str:
+            logging.error("Invalid setting format: %s. Must be key=value", setting_str)
+            sys.exit(1)
+        key, value = setting_str.split('=', 1)
+        settings[key] = value
+
     if not args.dummy_board:
         board = Board.get_board()
     else:
@@ -54,7 +72,7 @@ def main():
     app_cls.verify_dependencies()
     logging.info(f"Starting application: {args.app}")
     board.mode_text(f"App {args.app}")
-    app = app_cls(board)
+    app = app_cls(board, settings=settings)
     app.start()
     if args.dummy_board:
         # Only run application once

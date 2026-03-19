@@ -100,6 +100,7 @@ class HearTheWorld(BaseApplication):
 
 
     def run(self):
+        self.logger.debug('Starting with settings: %s', self.settings)
         while self.running:
             try:
                 self.board.statusbar("Ready - Press Button")
