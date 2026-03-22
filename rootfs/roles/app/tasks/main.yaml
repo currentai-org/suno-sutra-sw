@@ -43,6 +43,12 @@
   tags: [always]
   ansible.builtin.pip:
     requirements: ~/pocket-infer-sw/python/requirements.txt
-    virtualenv: ~/pocket-infer-sw/python/venv
-    virtualenv_site_packages: yes
+  become: true
     
+- name: Install pocketinfer package to system
+  tags: [always]
+  ansible.builtin.pip:
+    name: ~/pocket-infer-sw/python
+    state: present
+    editable: yes
+  become: true

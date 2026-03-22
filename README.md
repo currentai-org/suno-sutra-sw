@@ -14,9 +14,47 @@ At it's core, Suno Sutra is an embedded linux device with application code runni
 * A [Python service](./python/pocketinfer/service.py) that can serve applications on the device
 * [ioexpander](./ioexpander/) firmware relating to the IO Expander component.
 
+# Quickstart
+
+## Running the application
+
+### Devices with a UI (Handheld)
+
+The Suno Sutra Demo device and other devices with a screen / UI should boot directly into the application. It could take around 30-60 seconds after applying power, after which the status bar at the bottom should display "ready".
+
+Operation will depend on the default application. For example, for the "Hear the World" application, follow these steps:
+1. Aim the device at a scene of interest
+1. Press down the trigger button. The device will snap a photo.
+1. Ask a question about your environment
+1. Release the trigger button
+1. After a short delay, the device will show the answer on the screen and read it back on the speaker
+
+Press the back button (left-most button on the rear of the device) to open up the setings UI. You can use the touchscreen or device buttons to navigate. For the "Hear the World" demo, the input and output languages can be changed. And the settings UI can be used to switch between other applications. 
+
+### Devices without a UI (Development Board)
+
+The development board lacks a screen / UI, so it must be activated using a SSH console. The primary method of interaction is to manually execute the `pocketinfer-service` application and watch it's output.
+
+If you have not assembled the development kit, see the [SunoSutraDevboard assembly-instructions](https://github.com/currentai-org/suno-sutra-hw/tree/main/SunoSutraDevboard#assembly-instructions)
+
+1. Connect a USB cable to a Suno Sutra prototype device.
+    * For a Suno Sutra Devboard, connect using the USB-C jack
+    * For a Suno Sutra Demo (or other devices based on the Seeedstudio Mini ReComputer carrier board`), connect using the USB-Micro jack
+    * The device should enumerate as a USB RNDIS (Ethernet) network device, as well as a USB CDC device for fallback terminal access.
+1. Open a terminal and execute `ssh ubuntu@192.168.55.1` with password `ubuntu`. 
+1. Execute `pocketinfer-service` to run the default application
+    * For example, for the "Hear the World" sample application:
+    1. Aim the device at a scene of interest
+    1. Touch the capacitive touch button. The device will snap a photo.
+    1. Ask a question about your environment (using the microphone inside of the camera)
+    1. Release the button
+    1. After a short delay, the device will print the result to the screen read it back on the speaker
+
+For other options, see `pocketinfer-service --help`
+
 ## Development Quickstart
 
-This section implies you have access to a Suno Sutra prototype device and have connected to it over a USB-C cable. The device should enumerate as a USB RNDIS (Ethernet) network device, as well as a USB CDC device for fallback terminal access.
+This section implies you have access to a Suno Sutra prototype device and have connected to over USB. The device should enumerate as a USB RNDIS (Ethernet) network device, as well as a USB CDC device for fallback terminal access. 
 
 The easiest way to get up and running is to SSH into the device by executing `ssh ubuntu@192.168.55.1` with password `ubuntu`. Then the software can be edited directly on the device's filesystem. You could consider using VSCode with the Remote - SSH extension. For simplicity here's a sample way to get started that's fully terminal-based:
 
@@ -26,7 +64,9 @@ The easiest way to get up and running is to SSH into the device by executing `ss
 * Edit the file with `vim applications/<new name>.py`. Rename the class from `HearTheWorldEn` to the name of your new application
 * Edit the application manifest (which follows after `@RegisterApplication`). Update the name/description fields accordingly, and select any models and service_dependencies required by the application
 * Implement your desired application in the `run(self)` method of the Application class - see comments for examples and tips
-* Execute `sudo systemctl restart pocketinfer && journalctl -f -u pocketinfer` to restart the system service and view live logs. Use the device UI to activate the new application, and then watch the terminal 
+* Launch the application:
+    * For the Suno Sutra Demo or devices with UI: Execute `sudo systemctl restart pocketinfer && journalctl -f -u pocketinfer` to restart the system service and view live logs. Use the device UI to activate the new application, and then watch the terminal 
+    * For the Suno Sutra Devboard or devices without a UI: Execute `pocketinfer-service --app <new name>` to run the new application
 
 ## Hardware / Software Support
 

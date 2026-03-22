@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--audio-file', type=str, help='Path to 16kHz 16-bit wav file to use with dummy board')
     parser.add_argument('--image-file', type=str, help='Path to image file to use with dummy board')
     parser.add_argument('--settings-file', default=None, type=str, help='Path to JSON file with application settings to override defaults')
-    parser.add_argument('--setting', type=str, action='append', help='Override a specific application setting (can be used multiple times, e.g. --setting input_language=hi --setting output_language=en)')
+    parser.add_argument('--setting', default=[], type=str, action='append', help='Override a specific application setting (can be used multiple times, e.g. --setting input_language=hi --setting output_language=en)')
     args = parser.parse_args()
     # Temporary code to test application startup
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
