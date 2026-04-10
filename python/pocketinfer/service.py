@@ -4,9 +4,10 @@ import argparse
 import logging
 import time
 import threading
+import json
 from pocketinfer.applications import *
 from pocketinfer.applications.registry import ApplicationRegistry
-from pocketinfer.board import Board, DummyBoard
+from pocketinfer.boards.base import Board, DummyBoard
 from psutil import virtual_memory
 
 
