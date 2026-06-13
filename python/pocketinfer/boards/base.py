@@ -76,6 +76,8 @@ class Board:
     ALSA_CAPTURE_NAME = ''
     ALSA_PLAYBACK_NAME = ''
     ALSA_CAPTURE_RATE = 16000
+    ALSA_CAPTURE_CHANNEL_NAME = "Mic"
+    ALSA_PLAYBACK_CHANNEL_NAME = "Speaker"
 
     def __init__(self, args):
         self.logger = logging.getLogger(__name__)
@@ -88,12 +90,12 @@ class Board:
             camera_interface=self.V4L_CAMERA_INTERFACE
         )
         self.audio = audio.AudioRecorder(devname=self.ALSA_CAPTURE_NAME, rate=self.ALSA_CAPTURE_RATE, frames_per_buffer=4096)
-        self.ALSA_CAPTURE_CARD = audio.find_card_by_name(self.ALSA_CAPTURE_NAME)
-        self.ALSA_PLAYBACK_CARD = audio.find_card_by_name(self.ALSA_PLAYBACK_NAME)
+        self.ALSA_CAPTURE_CARD = audio.find_alsa_card_by_name(self.ALSA_CAPTURE_NAME)
+        self.ALSA_PLAYBACK_CARD = audio.find_alsa_card_by_name(self.ALSA_PLAYBACK_NAME)
         self.ALSA_PLAYBACK_DEVICE = f'hw:{self.ALSA_PLAYBACK_CARD},0'
         self.logger.debug('Detected ALSA capture card index: %s, Detected ALSA playback card index: %s', self.ALSA_CAPTURE_CARD, self.ALSA_PLAYBACK_CARD)
-        system(f'amixer -c {self.ALSA_CAPTURE_CARD} sset Mic 100% > /dev/null')
-        system(f'amixer -c {self.ALSA_PLAYBACK_CARD} sset Speaker 100% > /dev/null')
+        system(f'amixer -c {self.ALSA_CAPTURE_CARD} sset {self.ALSA_CAPTURE_CHANNEL_NAME} 100% > /dev/null')
+        system(f'amixer -c {self.ALSA_PLAYBACK_CARD} sset {self.ALSA_PLAYBACK_CHANNEL_NAME} 100% > /dev/null')
         self.ui_cbs = []
 
     def subscribe_to_ui(self, func):
@@ -159,46 +161,15 @@ class Board:
             args['carrier_ver'] = carrier_ver 
             # Load the correct board based on the carrier board
             if carrier_ver.startswith(b'699-13768-0000'):
-                from pocketinfer.boards.jetson import PocketInferDevboard
-                return PocketInferDevboard(args)
+                # We could also instantiate a PocketInferDevboard, which has no UI 
+                # But automatic detection of the screen is a challenge
+                from pocketinfer.boards.jetson import PocketInferDevboardUI
+                return PocketInferDevboardUI(args)
             if carrier_ver.startswith(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'):
                 # The seeeedstudio carrier board has an eeprom present but zero-ed out memory
                 from pocketinfer.boards.jetson import PocketInferDemo
                 return PocketInferDemo(args)
             raise NotImplementedError('Unsupported Carrier Board: '+carrier_ver.decode('utf-8'))
-        elif devicetree_model.startswith('Raspberry Pi'):
-            # Raspberry Pi detection will be based on devicetree model:
-            regex = re.compile(r"Raspberry Pi (\d+|Compute Module) (\d+)?.*")
-            match = regex.match(devicetree_model)
-            if match is None:
-                raise NotImplementedError(f'Cannot detect Raspberry Pi model {devicetree_model}')
-            a, b = match.groups()
-            if a == 'Compute Module':
-                # This is a Raspberry Pi Compute Module
-                # CM3 and below do not expose PCIe, so couldn't possibly connect to Hailo accelerator
-                if int(b) < 4:
-                    raise NotImplementedError(f'Compute Module {b} has no support for PCIe')
-            elif a.isdigit():
-                # This is a base Raspberry PI (e.g: Raspberry Pi 5, Raspberry pi 4, etc)
-                # Raspberry Pi 4 and below do not expose PCIe, so couldn't possibly connect to Hailo accelerator
-                if int(a) < 5:
-                    raise NotImplementedError(f'Raspberry Pi {b} has no support for PCIe')
-            else:
-                raise NotImplementedError(f'Unsupported Raspberry Pi model {devicetree_model}')
-            ret_code = system('hailortcli scan | grep "Device:"')
-            if ret_code:
-                raise NotImplementedError(f'Hailo accelerator not installed or detected')
-            hailo_ver_raw = run(['hailortcli', 'fw-control', 'identify'], capture_output=True, text=True)
-            match = re.search(r'Control Protocol Version:\s+(\d+)', hailo_ver_raw.stdout)
-            args["protocol_ver"] = match.group(1) if match else None
-            match = re.search(r'Firmware Version:\s+(\S+)', hailo_ver_raw.stdout)
-            args["fw_ver"] = match.group(1) if match else None
-            match = re.search(r'Device Architecture:\s+(\S+)', hailo_ver_raw.stdout)
-            args["arch"] = match.group(1) if match else None
-            if hailo_ver_raw.stderr:
-                raise NotImplementedError('Error detecting Hailo accelerator: '+hailo_ver_raw.stderr)
-            from pocketinfer.boards.raspi import RaspiAIHat2Board
-            return RaspiAIHat2Board(args)
         else:
             raise NotImplementedError('Unsupported linux platform: '+devicetree_model)
 

@@ -1,18 +1,28 @@
 from pocketinfer.serialcomms import IOInterface
 from pocketinfer.boards.base import Board
+from pocketinfer.ui.handheld import HandheldUI
 
 import Jetson.GPIO as GPIO
+
+import time
+import displayio
+import digitalio
+import board
+import fourwire
+import adafruit_ili9341
+import xpt2046_circuitpython as xpt2046
 
 
 class PocketInferDevboard(Board):
     V4L_CAMERA_NAME = 'Arducam_8mp'
     ALSA_CAPTURE_NAME = 'Arducam_8mp'
     ALSA_PLAYBACK_NAME = 'USB Audio Device'
-    TRIGGER_BOARD_IDX = 7
+    TRIGGER_BOARD_IDX = 'GP167'  # Physical pin 7 on header
 
     def __init__(self, args):
         super().__init__(args)
-        GPIO.setmode(GPIO.BOARD)
+        # Circuitpython modules may have already initialized in TEGRA_SOC mode.
+        GPIO.setmode(GPIO.TEGRA_SOC)
         GPIO.setup(self.TRIGGER_BOARD_IDX, GPIO.IN)
         GPIO.add_event_detect(self.TRIGGER_BOARD_IDX, GPIO.BOTH, callback=self.trig_cb, bouncetime=100)
 
@@ -25,6 +35,83 @@ class PocketInferDevboard(Board):
             self.trigger_button = False
             self.trigger_button_up.set()
             self.logger.debug("Trigger button up")
+
+class PocketInferDevboardUI(PocketInferDevboard):
+    TOUCH_IRQ_BOARD_IDX = 'GP37_SPI3_MISO'  # Physical pin 22 on header
+    ALSA_PLAYBACK_NAME = 'UACDemo'
+    ALSA_PLAYBACK_CHANNEL_NAME = "PCM"
+
+    def __init__(self, args):
+        super().__init__(args)
+        pwm_pin = digitalio.DigitalInOut(board.D18)
+        reset_pin = digitalio.DigitalInOut(board.D13)
+        tft_cs = board.D8
+        tft_dc = board.D22
+        touch_cs = board.D7
+        touch_irq = board.D25
+
+        GPIO.setmode(GPIO.TEGRA_SOC)
+        GPIO.setup(self.TOUCH_IRQ_BOARD_IDX, GPIO.IN)
+        GPIO.add_event_detect(self.TOUCH_IRQ_BOARD_IDX,
+                              GPIO.BOTH,
+                              callback=self.touch_cb,
+                              bouncetime=100)
+
+        # Setup SPI bus using hardware SPI:
+        i2c = board.I2C()
+        spi = board.SPI()
+        # RESET pin for display
+        reset_pin.direction = digitalio.Direction.OUTPUT
+        reset_pin.value = False
+        time.sleep(0.005)
+        reset_pin.value = True
+        time.sleep(0.005)
+        # Turn on the display backlight
+        pwm_pin.direction = digitalio.Direction.OUTPUT
+        pwm_pin.value = True
+
+        displayio.release_displays()
+        display_bus = fourwire.FourWire(spi,
+                                        command=tft_dc,
+                                        chip_select=tft_cs,
+                                        baudrate=30000000)
+        display = adafruit_ili9341.ILI9341(display_bus,
+                                           width=320,
+                                           height=240,
+                                           rotation=90)
+        touch = xpt2046.Touch(spi,
+                              cs=digitalio.DigitalInOut(touch_cs),
+                              interrupt=digitalio.DigitalInOut(touch_irq),
+                              force_baudrate=1000000)
+
+        self.UI = HandheldUI(display, touch)
+
+    def touch_cb(self, channel):
+        self.logger.debug("Touch IRQ")
+        self.UI.check_touch()
+
+    def clear_screen(self):
+        self.UI.clear_screen()
+
+    def statusbar(self, text):
+        self.UI.statusbar_text(text)
+        return True
+
+    def top_text(self, text):
+        self.UI.top_text(text)
+        return True
+
+    def bottom_text(self, text):
+        self.UI.bottom_text(text)
+        return True
+
+    def mode_text(self, text):
+        self.UI.mode_text(text)
+        return True
+
+    def memory_text(self, text):
+        self.UI.memory_text(text)
+        return True
 
 class RaspiAIHat2Board(Board):
     V4L_CAMERA_NAME = 'Arducam_8mp'

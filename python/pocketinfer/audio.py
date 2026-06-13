@@ -7,6 +7,7 @@ import numpy as np
 import shutil
 import subprocess
 import logging 
+import re
 from typing import Optional
 from speech_recognition import AudioData
 from contextlib import contextmanager
@@ -27,12 +28,22 @@ def noalsaerr():
     yield
     asound.snd_lib_error_set_handler(None)
 
-def find_card_by_name(devname):
+def find_pyaudio_idx_by_name(devname):
     p = pyaudio.PyAudio()
     for i in range(p.get_device_count()):
         devinfo = p.get_device_info_by_index(i)
         if devname in devinfo['name']:
             return i
+    return None
+
+def find_alsa_card_by_name(devname):
+    p = pyaudio.PyAudio()
+    regex = re.compile(r'.*\(\D+:(\d+),\d+\)')
+    for i in range(p.get_device_count()):
+        devinfo = p.get_device_info_by_index(i)
+        match = regex.match(devinfo['name'])
+        if devname in devinfo['name'] and match is not None:
+            return int(match.group(1))
     return None
 
 class AudioRecorder:
@@ -45,7 +56,7 @@ class AudioRecorder:
             self.p = pyaudio.PyAudio()
         self.device_idx = device_idx,
         if devname is not None:
-            newidx = find_card_by_name(devname)
+            newidx = find_pyaudio_idx_by_name(devname)
             if newidx is not None:
                 self.device_idx = newidx
         self.stream = None
