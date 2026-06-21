@@ -42,13 +42,13 @@
 - name: Install global python dependencies
   tags: [always]
   ansible.builtin.pip:
-    requirements: ~/pocket-infer-sw/python/requirements.txt
+    requirements: /home/ubuntu/pocket-infer-sw/python/requirements.txt
   become: true
     
 - name: Install pocketinfer package to system
   tags: [always]
   ansible.builtin.pip:
-    name: ~/pocket-infer-sw/python
+    name: /home/ubuntu/pocket-infer-sw/python
     state: present
     editable: yes
   become: true
