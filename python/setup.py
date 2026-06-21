@@ -15,6 +15,7 @@ setup(
     long_description_content_type='text/markdown',
     license='MIT',
     install_requires=requirements,
+    include_package_data=True,
     entry_points={
         'console_scripts': ['pocketinfer-service=pocketinfer.service:main'],
     },

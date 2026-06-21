@@ -2,19 +2,18 @@ import time
 import displayio
 import terminalio
 from os.path import join
-from appdirs import user_cache_dir
 from adafruit_display_text import label, text_box
 from adafruit_bitmap_font import bitmap_font
 from adafruit_button.button import Button
 
 from pocketinfer.ui import icons
+from importlib.resources import files
 
 
 class HandheldUI:
     def __init__(self, display, touch):
         self.display = display
         self.touch = touch
-        self.fontfolder = join(user_cache_dir("pocketinfer"), "font")
 
         # Make the display context
         self.layers = displayio.Group()
@@ -34,8 +33,8 @@ class HandheldUI:
         font = terminalio.FONT
         color = 0xFFFFFF
         color_dim = 0x777777
-        icon_font = bitmap_font.load_font(join(self.fontfolder, 'forkawesome-16.pcf'))
-        hindi_font = bitmap_font.load_font(join(self.fontfolder, 'NotoSansDevanagari-Regular-12.pcf'))
+        icon_font = bitmap_font.load_font(str(files('pocketinfer.ui').joinpath('forkawesome-16.pcf')))
+        hindi_font = bitmap_font.load_font(str(files('pocketinfer.ui').joinpath('NotoSansDevanagari-Regular-12.pcf')))
 
         # Create the text label
         self.statusbar = label.Label(font, text=" "*52, color=color_dim)
