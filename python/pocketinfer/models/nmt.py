@@ -28,9 +28,9 @@ class Nmt:
                 return True, "NMT service is available."
         except requests.exceptions.ConnectionError:
             print("Connection Error, trying to launch model")
-        check_output('systemctl restart bhashini-models', shell=True)
+        check_output('systemctl restart bhashini_models.service', shell=True)
         start = time.time()
-        while time.time() - start < 10.0:
+        while time.time() - start < 60.0:
             try:
                 response = requests.get("http://localhost:11400/health")
                 if response.status_code == 200:
