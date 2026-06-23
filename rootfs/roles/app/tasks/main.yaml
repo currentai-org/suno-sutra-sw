@@ -57,3 +57,10 @@
   tags: [always]
   ansible.builtin.command:
     cmd: /usr/local/bin/pocketinfer-service --update-app
+
+- name: Install polkit config
+  tags: [always]
+  ansible.builtin.copy:
+    src: manage-units.pkla
+    dest: /etc/polkit-1/localauthority/50-local.d/manage-units.pkla
+  become: true
