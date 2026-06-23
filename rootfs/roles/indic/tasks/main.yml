@@ -75,6 +75,13 @@
     virtualenv: ~/bhashini_models/venv
     virtualenv_site_packages: yes
 
+- name: Install ctranslate2 python bindings .whl
+  ansible.builtin.pip:
+    name: /tmp/ctranslate2-4.6.3-cp310-cp310-linux_aarch64.whl
+    state: present
+    virtualenv: ~/bhashini_models/venv
+    virtualenv_site_packages: yes
+
 - name: Force numpy compatibility
   ansible.builtin.pip:
     name: numpy<2

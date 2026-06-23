@@ -21,7 +21,7 @@ def main():
     parser.add_argument('--log-level', type=str, default='INFO', help='Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
     parser.add_argument('--app', type=str, default="HearTheWorld", help='Name of the application to run')
     parser.add_argument('--list-apps', action='store_true', help='List available applications and exit')
-    parser.add_argument('--update_app', action='store_true', default=False, help='Install dependencies for the specified application and exit')
+    parser.add_argument('--update-app', action='store_true', default=False, help='Install dependencies for the specified application and exit')
     parser.add_argument('--dummy-board', action='store_true', default=False, help='Do not use hardware features - load audio and image from file')
     parser.add_argument('--audio-file', type=str, help='Path to 16kHz 16-bit wav file to use with dummy board')
     parser.add_argument('--image-file', type=str, help='Path to image file to use with dummy board')

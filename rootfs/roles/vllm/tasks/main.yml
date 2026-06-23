@@ -13,7 +13,6 @@
   command: ollama pull ministral-3:3B
   when: "'ministral-3:3B:f04aa1c738f6' not in models.stdout_lines"
 
-- name: Install live-vlm-webui container
-  community.docker.docker_image_pull:
-    name: ghcr.io/nvidia-ai-iot/live-vlm-webui:latest-jetson-orin
-  become: true
+- name: Install Qwen ollama model
+  command: ollama pull qwen3-vl:2b
+  when: "'qwen3-vl:2b:0635d9d857d4' not in models.stdout_lines"
