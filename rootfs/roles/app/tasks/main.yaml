@@ -64,3 +64,17 @@
     src: manage-units.pkla
     dest: /etc/polkit-1/localauthority/50-local.d/manage-units.pkla
   become: true
+
+- name: Enable pinmux on expansion header
+  tags: [always]
+  ansible.builtin.command:
+    cmd: /opt/nvidia/jetson-io/config-by-function.py 1="i2c2 i2c8 spi1 uarta" -o dt
+    creates: /boot/jetson-io-hdr40-user-custom.dtbo
+  become: true
+
+- name: Copy DTB overlay to boot partition
+  tags: [always]
+  ansible.builtin.copy:
+    src: jetson-io-hdr40-user-custom.dtbo
+    dest: /boot/jetson-io-hdr40-user-custom.dtbo
+  become: true
