@@ -1,6 +1,6 @@
 from pocketinfer.serialcomms import IOInterface
 from pocketinfer.boards.base import Board
-from pocketinfer.ui.handheld import multiprocess_launch, UIConfig
+from pocketinfer.ui.handheld import IlI9341HandheldUI, ILI9341UIConfig
 from multiprocessing import Process, Queue, Pipe, set_start_method
 
 import Jetson.GPIO as GPIO
@@ -45,7 +45,7 @@ class PocketInferDevboardUI(PocketInferDevboard):
 
     def __init__(self, args):
         super().__init__(args)
-        cfg = UIConfig(
+        cfg = ILI9341UIConfig(
             reset_pin = 'GP36_SPI3_CLK',
             pwm_pin = 'GP122',
             cs_pin = 'GP50_SPI1_CS0_N',
@@ -61,38 +61,36 @@ class PocketInferDevboardUI(PocketInferDevboard):
         set_start_method('forkserver')
         self.parent_conn, child_conn = Pipe()
         self.touch_queue = Queue()
-        self._ui = Process(target=multiprocess_launch, args=(cfg, child_conn, self.touch_queue))
+        self._ui = Process(target=IlI9341HandheldUI.multiprocess_launch, args=(cfg, child_conn, self.touch_queue))
         self._ui.start()
+        self.UI = IlI9341HandheldUI.get_remote(self.parent_conn)
 
 
     def touch_cb(self, channel):
         self.logger.debug("Touch IRQ")
-        # self.UI.check_touch()
-        self.parent_conn.send(('touch',))
+        self.UI.check_touch()
 
     def clear_screen(self):
-        #self.UI.clear_screen()
-        self.parent_conn.send(('clear_screen',))
+        self.UI.clear_screen()
 
     def statusbar(self, text):
-        # self.UI.statusbar_text(text)
-        self.parent_conn.send(('statusbar', text))
+        self.UI.statusbar_text(text)
         return True
 
     def top_text(self, text):
-        self.parent_conn.send(('top_text', text))
+        self.UI.top_text(text)
         return True
 
     def bottom_text(self, text):
-        self.parent_conn.send(('bottom_text', text))
+        self.UI.bottom_text(text)
         return True
 
     def mode_text(self, text):
-        self.parent_conn.send(('mode_text', text))
+        self.UI.mode_text(text)
         return True
 
     def memory_text(self, text):
-        self.parent_conn.send(('memory_text', text))
+        self.UI.memory_text(text)
         return True
 
 class RaspiAIHat2Board(Board):
