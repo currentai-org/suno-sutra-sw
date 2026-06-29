@@ -103,15 +103,10 @@
   args:
     chdir: ~/bhashini_models/tts/flite
 
-- name: Download default voices
-  shell: make get_voices
-  args:
-    chdir: ~/bhashini_models/tts/flite
-
-- name: Download Indic voices
-  shell: ./bin/get_voices indic_voices
-  args:
-    chdir: ~/bhashini_models/tts/flite
+- name: Extract flite voices from local archive
+  ansible.builtin.unarchive:
+    src: flite_voices.zip
+    dest: ~/bhashini_models/tts/flite/voices/
 
 - name: Install Service
   ansible.builtin.copy:
