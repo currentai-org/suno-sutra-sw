@@ -8,6 +8,8 @@ from adafruit_button.button import Button
 
 from pocketinfer.ui import icons
 from importlib.resources import files
+from multiprocessing import Process, Queue, Pipe, Lock
+from typing import NamedTuple
 
 
 class HandheldUI:
@@ -317,18 +319,103 @@ class HandheldUI:
             print('CSettings')
 
     def check_touch(self):
-        if self.touch.is_pressed():
-            try:
-                args = self.touch.get_coordinates()
-                if args is not None:
-                    # NOTE, this implies 90 degree rotation on the display
-                    # TODO - make this more robust to different rotations and touch coordinate mappings
-                    y, x = args
-                    y = 240 - y
-                    print(f"Touch at ({x}, {y})")
-                    self.check_buttons(x, y)
-            except xpt2046.ReadFailedException as e:
-                pass
+        import xpt2046_circuitpython as xpt2046
+        try:
+            self.touch.spi.unlock()
+            if self.touch.is_pressed():
+                    args = self.touch.get_coordinates()
+                    if args is not None:
+                        # NOTE, this implies 90 degree rotation on the display
+                        # TODO - make this more robust to different rotations and touch coordinate mappings
+                        y, x = args
+                        y = 240 - y
+                        print(f"Touch at ({x}, {y})")
+                        self.check_buttons(x, y)
+        except xpt2046.ReadFailedException as e:
+            pass
+
+
+class UIConfig(NamedTuple):
+    reset_pin: str
+    pwm_pin: str
+    cs_pin: str
+    dc_pin: str
+    touch_cs: str
+    touch_irq: str
+    display_baudrate: int = 30000000
+    touch_baudrate: int =    1000000
+    width: int = 320
+    height: int = 240
+    rotation: int = 90
+
+
+def multiprocess_launch(ui_config: UIConfig, rpc_pipe, touch_queue: Queue):
+    import digitalio
+    import board
+    import fourwire
+    import adafruit_ili9341
+    import xpt2046_circuitpython as xpt2046
+
+    reset_pin = digitalio.DigitalInOut(board.pin.Pin(ui_config.reset_pin))
+    pwm_pin = digitalio.DigitalInOut(board.pin.Pin(ui_config.pwm_pin))
+    touch_cs = digitalio.DigitalInOut(board.pin.Pin(ui_config.touch_cs))
+    touch_irq = digitalio.DigitalInOut(board.pin.Pin(ui_config.touch_irq))
+    tft_cs = board.pin.Pin(ui_config.cs_pin)
+    tft_dc = board.pin.Pin(ui_config.dc_pin)
+    # reset_pin = digitalio.DigitalInOut(board.pin.Pin("GP36_SPI3_CLK"))
+    # pwm_pin = digitalio.DigitalInOut(board.D18)
+    # cs_pin = digitalio.DigitalInOut(board.D8)
+    # dc_pin = digitalio.DigitalInOut(board.D22)
+    # #reset_pin = digitalio.DigitalInOut(board.D13)
+    # tft_cs = board.D8
+    # tft_dc = board.D22
+    # touch_cs = board.D7
+    # touch_irq = board.D25
+
+    print('Starting SPI and reset')
+    # Setup SPI bus using hardware SPI:
+    spi = board.SPI()
+    # RESET pin for display
+    reset_pin.direction = digitalio.Direction.OUTPUT
+    reset_pin.value = False
+    time.sleep(0.005)
+    reset_pin.value = True
+    time.sleep(0.005)
+    # Turn on the display backlight
+    pwm_pin.direction = digitalio.Direction.OUTPUT
+    pwm_pin.value = True
+
+    print('Initialize bus and display')
+    displayio.release_displays()
+    display_bus = fourwire.FourWire(spi, command=tft_dc, chip_select=tft_cs, baudrate=ui_config.display_baudrate)
+    display = adafruit_ili9341.ILI9341(display_bus, width=ui_config.width, height=ui_config.height, rotation=ui_config.rotation)
+    touch = xpt2046.Touch(spi, cs=touch_cs, interrupt=touch_irq, force_baudrate=ui_config.touch_baudrate)
+    # touch = xpt2046.Touch(spi, cs=digitalio.DigitalInOut(touch_cs), interrupt=digitalio.DigitalInOut(touch_irq), force_baudrate=1000000)
+
+    print('load UI')
+    UI = HandheldUI(display, touch)
+
+    print('loop')
+    while True:
+        UI.check_touch()
+        if rpc_pipe.poll(0.1):
+            msg = rpc_pipe.recv()
+            print('Recv: ' + str(msg))
+            if msg[0] == 'top_text':
+                UI.top_text(msg[1])
+            elif msg[0] == 'bottom_text':
+                UI.bottom_text(msg[1])
+            elif msg[0] == 'statusbar':
+                UI.statusbar_text(msg[1])
+            elif msg[0] == 'mode_text':
+                UI.mode_text(msg[1])
+            elif msg[0] == 'memory_text':
+                UI.memory_text(msg[1])
+            elif msg[0] == 'clear_screen':
+                UI.clear_screen()
+            else:
+                print('Unknown RPC message: ' + str(msg))
+        # time.sleep(0.1)
 
 if __name__ == "__main__":
     import digitalio

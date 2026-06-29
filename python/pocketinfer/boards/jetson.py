@@ -1,16 +1,17 @@
 from pocketinfer.serialcomms import IOInterface
 from pocketinfer.boards.base import Board
-from pocketinfer.ui.handheld import HandheldUI
+from pocketinfer.ui.handheld import multiprocess_launch, UIConfig
+from multiprocessing import Process, Queue, Pipe, set_start_method
 
 import Jetson.GPIO as GPIO
 
-import time
-import displayio
-import digitalio
-import board
-import fourwire
-import adafruit_ili9341
-import xpt2046_circuitpython as xpt2046
+# import time
+# import displayio
+# import digitalio
+# import board
+# import fourwire
+# import adafruit_ili9341
+# import xpt2046_circuitpython as xpt2046
 
 
 class PocketInferDevboard(Board):
@@ -27,6 +28,7 @@ class PocketInferDevboard(Board):
         GPIO.add_event_detect(self.TRIGGER_BOARD_IDX, GPIO.BOTH, callback=self.trig_cb, bouncetime=100)
 
     def trig_cb(self, channel):
+        pass
         if GPIO.input(self.TRIGGER_BOARD_IDX):
             self.trigger_button = True
             self.trigger_button_down.set()
@@ -43,74 +45,54 @@ class PocketInferDevboardUI(PocketInferDevboard):
 
     def __init__(self, args):
         super().__init__(args)
-        pwm_pin = digitalio.DigitalInOut(board.D18)
-        reset_pin = digitalio.DigitalInOut(board.D13)
-        tft_cs = board.D8
-        tft_dc = board.D22
-        touch_cs = board.D7
-        touch_irq = board.D25
+        cfg = UIConfig(
+            reset_pin = 'GP36_SPI3_CLK',
+            pwm_pin = 'GP122',
+            cs_pin = 'GP50_SPI1_CS0_N',
+            dc_pin = 'GP88_PWM1',
+            touch_cs = 'GP51_SPI1_CS1_N',
+            touch_irq = 'GP37_SPI3_MISO',
+            display_baudrate = 30000000,
+            touch_baudrate = 1000000,
+            width = 320,
+            height = 240,
+            rotation = 90
+        )
+        set_start_method('forkserver')
+        self.parent_conn, child_conn = Pipe()
+        self.touch_queue = Queue()
+        self._ui = Process(target=multiprocess_launch, args=(cfg, child_conn, self.touch_queue))
+        self._ui.start()
 
-        GPIO.setmode(GPIO.TEGRA_SOC)
-        GPIO.setup(self.TOUCH_IRQ_BOARD_IDX, GPIO.IN)
-        GPIO.add_event_detect(self.TOUCH_IRQ_BOARD_IDX,
-                              GPIO.BOTH,
-                              callback=self.touch_cb,
-                              bouncetime=100)
-
-        # Setup SPI bus using hardware SPI:
-        i2c = board.I2C()
-        spi = board.SPI()
-        # RESET pin for display
-        reset_pin.direction = digitalio.Direction.OUTPUT
-        reset_pin.value = False
-        time.sleep(0.005)
-        reset_pin.value = True
-        time.sleep(0.005)
-        # Turn on the display backlight
-        pwm_pin.direction = digitalio.Direction.OUTPUT
-        pwm_pin.value = True
-
-        displayio.release_displays()
-        display_bus = fourwire.FourWire(spi,
-                                        command=tft_dc,
-                                        chip_select=tft_cs,
-                                        baudrate=30000000)
-        display = adafruit_ili9341.ILI9341(display_bus,
-                                           width=320,
-                                           height=240,
-                                           rotation=90)
-        touch = xpt2046.Touch(spi,
-                              cs=digitalio.DigitalInOut(touch_cs),
-                              interrupt=digitalio.DigitalInOut(touch_irq),
-                              force_baudrate=1000000)
-
-        self.UI = HandheldUI(display, touch)
 
     def touch_cb(self, channel):
         self.logger.debug("Touch IRQ")
-        self.UI.check_touch()
+        # self.UI.check_touch()
+        self.parent_conn.send(('touch',))
 
     def clear_screen(self):
-        self.UI.clear_screen()
+        #self.UI.clear_screen()
+        self.parent_conn.send(('clear_screen',))
 
     def statusbar(self, text):
-        self.UI.statusbar_text(text)
+        # self.UI.statusbar_text(text)
+        self.parent_conn.send(('statusbar', text))
         return True
 
     def top_text(self, text):
-        self.UI.top_text(text)
+        self.parent_conn.send(('top_text', text))
         return True
 
     def bottom_text(self, text):
-        self.UI.bottom_text(text)
+        self.parent_conn.send(('bottom_text', text))
         return True
 
     def mode_text(self, text):
-        self.UI.mode_text(text)
+        self.parent_conn.send(('mode_text', text))
         return True
 
     def memory_text(self, text):
-        self.UI.memory_text(text)
+        self.parent_conn.send(('memory_text', text))
         return True
 
 class RaspiAIHat2Board(Board):
