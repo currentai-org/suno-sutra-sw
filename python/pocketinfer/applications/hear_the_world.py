@@ -68,10 +68,10 @@ class HearTheWorld(BaseApplication):
             check_output('systemctl restart pocketinfer', shell=True)
         elif msg == 'Reboot':
             self.logger.info('REbooting!')
-            check_output('reboot', shell=True)
+            # check_output('reboot', shell=True)
         elif msg == 'Shutdown':
             self.logger.info('Shutdown!')
-            check_output('halt', shell=True)
+            # check_output('halt', shell=True)
         elif msg.startswith('ASR'):
             self.settings['input_language'] = msg[4:].lower()
         elif msg.startswith('TTS'):

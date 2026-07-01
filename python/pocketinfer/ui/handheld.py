@@ -1,5 +1,6 @@
 import time
 import logging
+import uuid
 import displayio
 import terminalio
 from os.path import join
@@ -9,15 +10,28 @@ from adafruit_button.button import Button
 
 from pocketinfer.ui import icons
 from importlib.resources import files
-from multiprocessing import Process, Queue, Pipe, Lock
+from multiprocessing import Queue, Pipe
+import multiprocessing.connection
 from typing import NamedTuple
 
 
 class HandheldUI:
+    ''' This is a graphical UI based on the Adafruit displayIO framework.
+    It was originally designed for a circuitpython IO expander board, but has been adapted to run on an Embedded linux platform 
+    via the Adafruit blinka compatibility layer. It is designed for a 320x240 pixel touchscreen.
+    This class is agnostic to the underlying display and transport, but will be subclassed for specific hardware support.
+    '''
+    ICON_FONT = bitmap_font.load_font(str(files('pocketinfer.ui').joinpath('forkawesome-16.pcf')))
+    HINDI_FONT = bitmap_font.load_font(str(files('pocketinfer.ui').joinpath('NotoSansDevanagari-Regular-12.pcf')))
+
     def __init__(self, display, touch, logger=None):
+        ''' Load the UI into memory'''
         self.logger = logger or logging.getLogger(__name__)
         self.display = display
         self.touch = touch
+
+        self.button_cbs = {}
+        self.buttons = {}
 
         # Make the display context
         self.layers = displayio.Group()
@@ -37,8 +51,6 @@ class HandheldUI:
         font = terminalio.FONT
         color = 0xFFFFFF
         color_dim = 0x777777
-        icon_font = bitmap_font.load_font(str(files('pocketinfer.ui').joinpath('forkawesome-16.pcf')))
-        hindi_font = bitmap_font.load_font(str(files('pocketinfer.ui').joinpath('NotoSansDevanagari-Regular-12.pcf')))
 
         # Create the text label
         self.statusbar = label.Label(font, text=" "*52, color=color_dim)
@@ -51,52 +63,41 @@ class HandheldUI:
         self.modeval = label.Label(font, text=" "*52, color=color_dim)
         self.modeval.anchor_point = (0.0, 0.0)
         self.modeval.anchored_position = (0, 3)
-        # modeval.text = "App: HearTheWorldEn"
+        self.modeval.text = "Initializing..."
         self.topbar.append(self.modeval)
 
-        self.home_button = Button(
-            x=320-28,
-            y=0,
-            width=28,
-            height=28,
-            label=icons.home,
-            label_font=icon_font,
-            label_color=color,
-            fill_color=0x000000,
-            outline_color=0x000000,
-        )
-        self.topbar.append(self.home_button)
-        self.settings_button = Button(
-            x=320-28*2,
-            y=0,
-            width=28,
-            height=28,
-            label=icons.book,
-            label_font=icon_font,
-            label_color=color,
-            fill_color=0x000000,
-            outline_color=0x000000,
-        )
-        self.topbar.append(self.settings_button)
+        def _toggle_setpage(name):
+            self.buttons[name].selected = False # leave button deselected
+            if self.setpage.hidden:
+                self.setpage.hidden = False
+                self.appui.hidden = True
+            else:
+                self.setpage.hidden = True
+                self.appui.hidden = False
+
+        self.topbar.append(self._button('Home', x=320-28, y=0, width=28, height=28, label=icons.home, font=self.ICON_FONT,
+                                        label_color=color, fill_color=0x000000, outline_color=0x000000))
+        self.topbar.append(self._button('Settings', x=320-28*2, y=0, width=28, height=28, label=icons.book, font=self.ICON_FONT,
+                                        label_color=color, fill_color=0x000000, outline_color=0x000000, cb=_toggle_setpage))
 
         # Create the text label
-        self.battval = label.Label(icon_font, text=f"{icons.microchip}     {icons.battery_full}", color=color)
+        self.battval = label.Label(self.ICON_FONT, text=f"{icons.microchip}     {icons.battery_full}", color=color)
         self.battval.anchor_point = (1.0, 0.0)
         self.battval.anchored_position = (320-28*2-4, 3)
         self.topbar.append(self.battval)
 
-        self.memval = label.Label(hindi_font, text="    ", color=color)
+        self.memval = label.Label(self.HINDI_FONT, text="    ", color=color)
         self.memval.anchor_point = (1.0, 0.0)
-        self.memval.anchored_position = (240, 8)
+        self.memval.anchored_position = (320-28*4-4, 8)
         self.topbar.append(self.memval)
 
-        self.toptext = text_box.TextBox(x=0, y=0, width=320, height=100, line_spacing=0.80, font=hindi_font, color=color)
+        self.toptext = text_box.TextBox(x=0, y=0, width=320, height=100, line_spacing=0.80, font=self.HINDI_FONT, color=color)
         self.toptext.anchor_point = (0.0, 0.0)
         self.toptext.anchored_position = (0, 16)
         self.appui.append(self.toptext)
 
 
-        self.bottomtext = text_box.TextBox(x=0, y=100, width=320, height=100, line_spacing=0.8, font=hindi_font, color=color)
+        self.bottomtext = text_box.TextBox(x=0, y=100, width=320, height=100, line_spacing=0.8, font=self.HINDI_FONT, color=color)
         self.bottomtext.anchor_point = (0.0, 0.0)
         self.bottomtext.anchored_position = (0, 100)
         self.appui.append(self.bottomtext)
@@ -109,149 +110,39 @@ class HandheldUI:
         settingslabel.text = "Settings"
         self.setpage.append(settingslabel)
 
-        self.settings_buttons = {}
-
         input_lang = label.Label(font, text="ASR Lang ", color=color)
         input_lang.anchor_point = (0.0, 0.5)
         input_lang.anchored_position = (0, 48)
         self.setpage.append(input_lang)
 
-        self.settings_buttons['ASR En'] = Button(
-            x=64,
-            y=32,
-            width=64,
-            height=32,
-            label="ASR En",
-            label_font=hindi_font,
-            label_color=0xFF7E00,
-            fill_color=0x5C5B5C,
-            outline_color=0x767676,
-            selected_fill=0x1A1A1A,
-            selected_outline=0x2E2E2E,
-        )
+        def _deselect_other_asr(name):
+            for other in filter(lambda x: x.startswith('ASR ') and x != name, self.buttons.keys()):
+                self.buttons[other].selected = False
 
-        self.settings_buttons['ASR Hi'] = Button(
-            x=64+64,
-            y=32,
-            width=64,
-            height=32,
-            label="ASR Hi",
-            label_font=hindi_font,
-            label_color=0xFF7E00,
-            fill_color=0x5C5B5C,
-            outline_color=0x767676,
-            selected_fill=0x1A1A1A,
-            selected_outline=0x2E2E2E,
-        )
-
-        self.settings_buttons['ASR Ta'] = Button(
-            x=64+64*2,
-            y=32,
-            width=64,
-            height=32,
-            label="ASR Ta",
-            label_font=hindi_font,
-            label_color=0xFF7E00,
-            fill_color=0x5C5B5C,
-            outline_color=0x767676,
-            selected_fill=0x1A1A1A,
-            selected_outline=0x2E2E2E,
-        )
+        self.setpage.append(self._button('ASR En', x=64, y=32, selected=True, cb=_deselect_other_asr))
+        self.setpage.append(self._button('ASR Hi', x=64+64, y=32, cb=_deselect_other_asr))
+        self.setpage.append(self._button('ASR Ta', x=64+64*2, y=32, cb=_deselect_other_asr))
 
         output_lang = label.Label(font, text="TTS Lang ", color=color)
         output_lang.anchor_point = (0.0, 0.5)
         output_lang.anchored_position = (0, int(64+32/2))
         self.setpage.append(output_lang)
 
-        self.settings_buttons['TTS En'] = Button(
-            x=64,
-            y=64,
-            width=64,
-            height=32,
-            label="TTS En",
-            label_font=hindi_font,
-            label_color=0xFF7E00,
-            fill_color=0x5C5B5C,
-            outline_color=0x767676,
-            selected_fill=0x1A1A1A,
-            selected_outline=0x2E2E2E,
-        )
+        def _deselect_other_tts(name):
+            for other in filter(lambda x: x.startswith('TTS ') and x != name, self.buttons.keys()):
+                self.buttons[other].selected = False
 
-        self.settings_buttons['TTS Hi'] = Button(
-            x=64+64,
-            y=64,
-            width=64,
-            height=32,
-            label="TTS Hi",
-            label_font=hindi_font,
-            label_color=0xFF7E00,
-            fill_color=0x5C5B5C,
-            outline_color=0x767676,
-            selected_fill=0x1A1A1A,
-            selected_outline=0x2E2E2E,
-        )
+        self.setpage.append(self._button('TTS En', x=64, y=64, selected=True, cb=_deselect_other_tts))
+        self.setpage.append(self._button('TTS Hi', x=64+64, y=64, cb=_deselect_other_tts))
+        self.setpage.append(self._button('TTS Ta', x=64+64*2, y=64, cb=_deselect_other_tts))
 
-        self.settings_buttons['TTS Ta'] = Button(
-            x=64+64*2,
-            y=64,
-            width=64,
-            height=32,
-            label="TTS Ta",
-            label_font=hindi_font,
-            label_color=0xFF7E00,
-            fill_color=0x5C5B5C,
-            outline_color=0x767676,
-            selected_fill=0x1A1A1A,
-            selected_outline=0x2E2E2E,
-        )
+        def _close_setpage(name):
+            self.setpage.hidden = True
+            self.appui.hidden = False
 
-        self.settings_buttons['Reset'] = Button(
-            x=64,
-            y=192,
-            width=64,
-            height=32,
-            label="Reset",
-            label_font=hindi_font,
-            label_color=0xFF7E00,
-            fill_color=0x5C5B5C,
-            outline_color=0x767676,
-            selected_fill=0x1A1A1A,
-            selected_outline=0x2E2E2E,
-        )
-
-        self.settings_buttons['Shutdown'] = Button(
-            x=64*2,
-            y=192,
-            width=64,
-            height=32,
-            label="Shutdown",
-            label_font=hindi_font,
-            label_color=0xFF7E00,
-            fill_color=0x5C5B5C,
-            outline_color=0x767676,
-            selected_fill=0x1A1A1A,
-            selected_outline=0x2E2E2E,
-        )
-
-        self.settings_buttons['Reboot'] = Button(
-            x=64*3,
-            y=192,
-            width=64,
-            height=32,
-            label="Reboot",
-            label_font=hindi_font,
-            label_color=0xFF7E00,
-            fill_color=0x5C5B5C,
-            outline_color=0x767676,
-            selected_fill=0x1A1A1A,
-            selected_outline=0x2E2E2E,
-        )
-
-        self.settings_buttons['ASR En'].selected = True
-        self.settings_buttons['TTS En'].selected = True
-
-        for but in self.settings_buttons.values():
-            self.setpage.append(but)
+        self.setpage.append(self._button('Reset', x=64, y=192, cb=_close_setpage))
+        self.setpage.append(self._button('Shutdown', x=64*2, y=192, cb=_close_setpage))
+        self.setpage.append(self._button('Reboot', x=64*3, y=192, cb=_close_setpage))
 
         self.setpage.hidden = True
         # self.layers.append(bg_sprite)
@@ -259,25 +150,57 @@ class HandheldUI:
         self.layers.append(self.appui)
         self.layers.append(self.setpage)
 
-        self.last_blink = time.monotonic()
-        self.last_press = time.monotonic()
-        self.last_trigger_button = False
-        self.last_touched = False
-        self.last_buttons = [False, False, False, False]
+    def get_button_names(self):
+        ''' Return a list of all button names in the UI '''
+        return list(self.buttons.keys())
+    
+    def get_button_status(self):
+        ''' Return a dict of button names and their selected status (True/False) '''
+        return {name: self.buttons[name].selected for name in self.buttons.keys()}
+
+    def _button(self, name, x, y, label=None, font=None, width=64, height=32,
+                label_color=0xFF7E00, fill_color=0x5C5B5C, outline_color=0x767676, cb=None, selected=False):
+        ''' Create a button and add it to the button list. If a callback is provided, it will be called when the button is pressed.
+        Note that the button object returned should be added to the correct Group for it to be displayed'''
+        if font is None:
+            font = self.HINDI_FONT
+        if label is None:
+            label = name
+        button = Button(
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            label=label,
+            label_font=font,
+            label_color=label_color,
+            fill_color=fill_color,
+            outline_color=outline_color,
+        )
+        button.selected = selected
+        self.buttons[name] = button
+        if cb:
+            self.subscribe_to_button(name, cb)
+        return button
 
     def top_text(self, text):
+        ''' Set the top text area, which is the upper half of the screen. '''
         self.toptext.text = text
     
     def bottom_text(self, text):
+        ''' Set the bottom text area, which is the lower half of the screen. '''
         self.bottomtext.text = text
 
     def statusbar_text(self, text):
+        ''' Set the status bar text, which is the bottom line of the screen. '''
         self.statusbar.text = text
     
     def mode_text(self, text):
+        ''' Set the Mode value, in the upper left hand corner. '''
         self.modeval.text = text
 
     def memory_text(self, text):
+        ''' Set the RAM usage value. '''
         self.memval.text = text
     
     def clear_screen(self):
@@ -292,38 +215,43 @@ class HandheldUI:
         self.display.root_group = self.layers
         self.display.refresh()
 
+    def _dispatch_button_cb(self, button_name):
+        ''' Call the callback for a button press, if one is registered. '''
+        if button_name in self.button_cbs:
+            cbs = self.button_cbs[button_name]
+            for cb in cbs:
+                if callable(cb):
+                    cb(button_name)
+
+    def subscribe_to_button(self, button_name, callback):
+        ''' Register a callback for a button press. The callback will be called with the button name as an argument. '''
+        if button_name not in self.button_cbs:
+            self.button_cbs[button_name] = []
+        self.button_cbs[button_name].append(callback)
+
+    def unsubscribe_from_button(self, button_name, callback):
+        ''' Unregister a callback for a button press. '''
+        if button_name in self.button_cbs:
+            cbs = self.button_cbs[button_name]
+            if callback in cbs:
+                cbs.remove(callback)
+
     def check_buttons(self, x, y):
-        for name in self.settings_buttons:
-            butt = self.settings_buttons[name]
+        ''' Check if a touch event at (x, y) is within any button, and if so, call the callback for that button. '''
+        for name in self.buttons:
+            butt = self.buttons[name]
             if butt.selected:
                 continue
             if butt.contains((x, y)):
-                names = list(self.settings_buttons.keys())
-                for other in filter(lambda x: x.startswith(name.split(' ')[0]), names):
-                    self.settings_buttons[other].selected = False
-                if name == 'Reset' or name == 'Reboot' or name == 'Shutdown':
-                    self.setpage.hidden = True
-                    self.appui.hidden = False
-                    print('C'+name)
-                    if name == 'Reboot':
-                        time.sleep(0.1)
-                        # microcontroller.reset()
-                else:
-                    butt.selected = True
-                print('C'+name)
-        if self.settings_button.contains((x, y)):
-            if self.setpage.hidden:
-                self.setpage.hidden = False
-                self.appui.hidden = True
-            else:
-                self.setpage.hidden = True
-                self.appui.hidden = False
-            print('CSettings')
+                butt.selected = True
+                self._dispatch_button_cb(name)
 
     def check_touch(self):
+        # TODO - this is specific to the xpt2046 controller and involves SPI internals, should be made generic or moved out
+        # It's possible this method was called while the display is in in the process of a refresh and is using the SPI bus
+        # IF that's the case, the touch read will fail and throw an exception, which we catch and ignore. This is not ideal, but it works for now.
         import xpt2046_circuitpython as xpt2046
         try:
-            self.touch.spi.unlock()
             if self.touch.is_pressed():
                     args = self.touch.get_coordinates()
                     if args is not None:
@@ -337,20 +265,56 @@ class HandheldUI:
             pass
 
 class ILI9341UIConfig(NamedTuple):
-    reset_pin: str
-    pwm_pin: str
-    cs_pin: str
-    dc_pin: str
-    touch_cs: str
-    touch_irq: str
-    display_baudrate: int = 30000000
-    touch_baudrate: int =    1000000
-    width: int = 320
-    height: int = 240
-    rotation: int = 90
+    ''' Configuration for the ILI9341 display and touch controller. '''
+    reset_pin: str  # The Jetson SOC pin name for the LCD_RST line
+    pwm_pin: str  # The Jetson SOC pin name for the LCD_BL line
+    cs_pin: str  # The Jetson SOC pin name for the LCD_CS line
+    dc_pin: str  # The Jetson SOC pin name for the LCD_DC line
+    touch_cs: str  # The Jetson SOC pin name for the TP_CS line
+    touch_irq: str  # The Jetson SOC pin name for the TP_IRQ line
+    display_baudrate: int = 30000000    # Baud rate when communicating with the display controller over SPI
+    touch_baudrate: int =    1000000    # Baud rate when communicating with the touch controller over SPI
+    width: int = 320    # Width of the display in pixels
+    height: int = 240   # Height of the display in pixels
+    rotation: int = 90  # Rotation of the display in degrees
+
+class UIRPCCall:
+    ''' This class is used to send a function call from one process to another, and receive the result. It is used to allow the main application process to call functions in the UI process, and receive the result. '''
+    def __init__(self, func_name, *args):
+        ''' Initialize the UIRPCCall with the function name and arguments. The function name must be a string, and the arguments must be serializable. '''
+        self.func_name = func_name
+        self.args = args
+        self.executed = False
+        self.exception = None 
+        self.result = None
+        self._id = uuid.uuid4()
+    
+    def send(self, rpc_pipe: multiprocessing.connection.Connection):
+        ''' Send this request to the other process via the provided pipe, and wait for the result. If the function raises an exception, it will be re-raised in this process.
+         If the function returns a value, it will be returned to this process. '''
+        rpc_pipe.send(self)
+        ret = rpc_pipe.recv()
+        if ret._id != self._id:
+            raise RuntimeError("Mismatched RPC response ID, multiple RPC callers may be active at the same time, which is not supported.")
+        if ret.exception is not None:
+            raise ret.exception
+        return ret.result
+    
+    def execute(self, func, rpc_pipe: multiprocessing.connection.Connection):
+        ''' Execute the function in the other process, and send the result back via the provided pipe. If an exception is raised, it will be sent back to the calling process. '''
+        if callable(func):
+            try:
+                self.result = func(*self.args)
+            except Exception as e:
+                self.exception = e 
+            self.executed = True
+        else:
+            self.result = func
+        rpc_pipe.send(self)
 
 
 class IlI9341HandheldUI(HandheldUI):
+    ''' A subclass of HandheldUI that runs on a SPI ILI9341 display with an XPT2046 touch controller, using the Adafruit Blinka compatibility layer for Jetson SOCs. '''
     def __init__(self, ui_config: ILI9341UIConfig, logger=None):
         import digitalio
         import board
@@ -390,30 +354,38 @@ class IlI9341HandheldUI(HandheldUI):
         super().__init__(display, touch, self.logger)
     
     @classmethod
-    def multiprocess_launch(cls, ui_config: ILI9341UIConfig, rpc_pipe, touch_queue: Queue):
+    def multiprocess_launch(cls, ui_config: ILI9341UIConfig, rpc_pipe: multiprocessing.connection.Connection, button_queue: multiprocessing.Queue):
+        ''' Instantiate a new UI object and continuously check for touch events and requests from a remote process
+        This is designed to be run via multiprocessing.Process, and will block until the process is terminated.
+        The rpc_pipe is used to receive requests from the main application process, and the button_queue is used to send button press events back to the main application process.  '''
+        def button_cb(name):
+            button_queue.put(name)
         UI = cls(ui_config)
+        for name in UI.buttons:
+            UI.subscribe_to_button(name, button_cb)
         UI.logger.debug('loop')
         while True:
             UI.check_touch()
             if rpc_pipe.poll(0.1):
-                msg = rpc_pipe.recv()
-                func_name = msg[0]
-                args = msg[1:] if len(msg) > 1 else ()
-                UI.logger.debug('Recv: ' + str(msg))
-                if callable(getattr(UI, func_name)):
-                    ret = getattr(UI, func_name)(*args)
+                call = rpc_pipe.recv()
+                func = getattr(UI, call.func_name, None)
+                if func is not None:
+                    call.execute(func, rpc_pipe)
                 else:
-                    UI.logger.error('Unknown RPC function: ' + str(func_name))
+                    UI.logger.error('Unknown RPC function: ' + call.func_name)
     
     @classmethod
-    def get_remote(cls, rpc_pipe):
+    def get_remote(cls, rpc_pipe: multiprocessing.connection.Connection):
+        ''' Return a proxy object that can be used to call functions in the UI process via the provided pipe.
+        The proxy object will have the same methods as the UI class, and will send requests to the UI process and wait for the result.  '''
         class RemoteUI:
             def __init__(self, rpc_pipe):
                 self.rpc_pipe = rpc_pipe
             
             def __getattr__(self, name):
                 def remote_call(*args):
-                    self.rpc_pipe.send((name, *args))
+                    call = UIRPCCall(name, *args)
+                    return self.rpc_pipe.send(call)
                 return remote_call
         return RemoteUI(rpc_pipe)
 

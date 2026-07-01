@@ -1,9 +1,13 @@
+import queue
+
 from pocketinfer.serialcomms import IOInterface
 from pocketinfer.boards.base import Board
 from pocketinfer.ui.handheld import IlI9341HandheldUI, ILI9341UIConfig
 from multiprocessing import Process, Queue, Pipe, set_start_method
 
 import Jetson.GPIO as GPIO
+
+from threading import Thread
 
 # import time
 # import displayio
@@ -60,11 +64,26 @@ class PocketInferDevboardUI(PocketInferDevboard):
         )
         set_start_method('forkserver')
         self.parent_conn, child_conn = Pipe()
-        self.touch_queue = Queue()
-        self._ui = Process(target=IlI9341HandheldUI.multiprocess_launch, args=(cfg, child_conn, self.touch_queue))
+        self.button_queue = Queue()
+        self._ui = Process(target=IlI9341HandheldUI.multiprocess_launch, args=(cfg, child_conn, self.button_queue))
         self._ui.start()
+        self.ui_thread = Thread(target=self._process_ui_events, daemon=True)
+        self.ui_thread_running = True
+        self.ui_thread.start()
         self.UI = IlI9341HandheldUI.get_remote(self.parent_conn)
 
+    def _process_ui_events(self):
+        while self.ui_thread_running:
+            try:
+                name = self.button_queue.get(timeout=1.0)
+            except queue.Empty:
+                continue
+            for cb in self.ui_cbs:
+                try:
+                    cb(name)
+                except:
+                    self.logger.exception("Error in UI callback")
+                    continue
 
     def touch_cb(self, channel):
         self.logger.debug("Touch IRQ")
