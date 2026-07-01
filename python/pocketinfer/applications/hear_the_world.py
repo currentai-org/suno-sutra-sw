@@ -68,10 +68,10 @@ class HearTheWorld(BaseApplication):
             check_output('systemctl restart pocketinfer', shell=True)
         elif msg == 'Reboot':
             self.logger.info('REbooting!')
-            check_output('reboot', shell=True)
+            # check_output('reboot', shell=True)
         elif msg == 'Shutdown':
             self.logger.info('Shutdown!')
-            check_output('halt', shell=True)
+            # check_output('halt', shell=True)
         elif msg.startswith('ASR'):
             self.settings['input_language'] = msg[4:].lower()
         elif msg.startswith('TTS'):
@@ -104,7 +104,7 @@ class HearTheWorld(BaseApplication):
         while self.running:
             try:
                 self.board.statusbar("Ready - Press Button")
-                self.board.UI.force_refresh()
+                # self.board.UI.force_refresh()
                 self.board.wait_for_trigger_button_down()
                 self.board.statusbar("Release Button")
                 self.board.top_text("")
