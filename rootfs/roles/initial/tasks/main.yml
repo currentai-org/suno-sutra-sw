@@ -93,6 +93,7 @@
     - python3-setuptools
     - python3-venv
     - ffmpeg
+    - git-lfs
   become: true
 
 - name: Install global python dependencies

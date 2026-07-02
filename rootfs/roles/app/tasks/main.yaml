@@ -19,25 +19,20 @@
     - flac
   become: true
 
-- name: Copy root application code
+- name: Clone root application code
   tags: [always]
-  ansible.builtin.synchronize:
-    src: "{{ playbook_dir }}/../python"
-    dest: ~/pocket-infer-sw
-    delete: no
-    rsync_opts:
-      - "--exclude=.git"
-      - "--exclude=venv"
+  ansible.builtin.git:
+    repo: 'https://github.com/currentai-org/suno-sutra-sw.git'
+    version: main
+    dest: /home/ubuntu/pocket-infer-sw
+  environment:
+    GIT_LFS_SKIP_SMUDGE: 1
 
-- name: Copy IO Expander Code
-  tags: [demo]
-  ansible.builtin.synchronize:
-    src: "{{ playbook_dir }}/../ioexpander"
-    dest: ~/pocket-infer-sw
-    delete: no
-    rsync_opts:
-      - "--exclude=.git"
-      - "--exclude=venv"
+- name: Pull LFS objects for root application code only
+  tags: [always]
+  ansible.builtin.command:
+    cmd: git lfs pull --include "python/**"
+    chdir: /home/ubuntu/pocket-infer-sw
 
 - name: Install global python dependencies
   tags: [always]
