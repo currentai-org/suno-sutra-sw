@@ -1,11 +1,4 @@
 ---
-# Assumes pytorch has already been installed as apart of SDK / base installation
-# This container may not be necessary....
-# - name: Install pytorch:25.06 container
-#   community.docker.docker_image_pull:
-#     name: nvcr.io/nvidia/pytorch:25.06-py3
-#   become: true
-
 # Ctranslate2 requires a dependency from intel's OneAPI
 - name: Add Intel OneAPI keyring
   shell: wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
