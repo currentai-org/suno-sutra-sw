@@ -101,6 +101,11 @@
     src: flite_voices.zip
     dest: ~/bhashini_models/tts/flite/voices/
 
+- name: Download NLTK data
+  shell: /home/ubuntu/bhashini_models/venv/bin/python -c "import nltk;nltk.download('punkt_tab')"
+  args:
+    chdir: ~/bhashini_models
+
 - name: Install Service
   ansible.builtin.copy:
     src: /home/ubuntu/bhashini_models/bhashini_models.service
