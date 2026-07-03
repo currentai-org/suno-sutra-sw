@@ -96,6 +96,11 @@
   args:
     chdir: ~/bhashini_models/tts/flite
 
+- name: Make flite voices directory
+  ansible.builtin.file:
+    path: ~/bhashini_models/tts/flite/voices
+    state: directory
+
 - name: Extract flite voices from local archive
   ansible.builtin.unarchive:
     src: flite_voices.zip
