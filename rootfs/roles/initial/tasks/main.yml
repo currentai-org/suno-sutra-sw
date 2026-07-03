@@ -24,6 +24,32 @@
   shell: systemctl set-default multi-user
   become: true
 
+- name: Disable ZRAM
+  tags: [always]
+  shell: systemctl disable nvzramconfig
+  become: true
+
+- name: Ensure Swapfile is created
+  tags: [always]
+  ansible.builtin.shell: |
+    if [ ! -f /swapfile ]; then
+      fallocate -l 8G /swapfile
+      chmod 600 /swapfile
+      mkswap /swapfile
+      swapon /swapfile
+    fi
+  args:
+    creates: "/swapfile" # Skip if this file exists
+  become: true
+
+- name: Ensure Swapfile is enabled on boot
+  tags: [always]
+  shell: |
+    if ! grep -q '/swapfile' /etc/fstab; then
+      echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+    fi
+  become: true
+
 # Needed for seeedstudio carrier board:
 # The nvidia-l4t-bootloader cannot be updated on custom hardware
 # And it's a dependency for several other packages
