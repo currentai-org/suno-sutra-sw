@@ -377,7 +377,7 @@ class IlI9341HandheldUI(HandheldUI):
     @classmethod
     def get_remote(cls, rpc_pipe: multiprocessing.connection.Connection):
         ''' Return a proxy object that can be used to call functions in the UI process via the provided pipe.
-        The proxy object will have the same methods as the UI class, and will send requests to the UI process and wait for the result.  '''
+    The proxy object will have the same methods as the UI class, and will send requests to the UI process and wait for the result.  '''
         class RemoteUI:
             def __init__(self, rpc_pipe):
                 self.rpc_pipe = rpc_pipe

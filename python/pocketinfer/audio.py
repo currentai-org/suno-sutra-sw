@@ -21,6 +21,9 @@ def py_error_handler(filename, line, function, err, fmt):
 
 c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
 
+# pyaudio, and it's ALSA implementation, tends to drop a lot of unnecessary log info on instantiation
+# They're not actionable messages, and it would take considerable rootfs tweaking to remove otherwise
+# So instead, we'll suppress all libasound error messages on pyaudio startup
 @contextmanager
 def noalsaerr():
     asound = cdll.LoadLibrary('libasound.so')
@@ -28,41 +31,109 @@ def noalsaerr():
     yield
     asound.snd_lib_error_set_handler(None)
 
-def find_pyaudio_idx_by_name(devname):
-    p = pyaudio.PyAudio()
+def alsa_devices_filtered(record=False, playback=False, blacklist=None):
+    ''' Using pyaudio backend, retrieve list of audio devices
+    When record=True, these will be capture devices
+    When playback=True, these will be playback devices,
+    Blacklist can be provided as a list of names that will be skipped
+    Note: only valid ALSA devices (hw:X,Y) will be retrieved '''
+    if blacklist is None:
+        blacklist = []
+    with noalsaerr():
+        p = pyaudio.PyAudio()
+    devices = []
+    regex = re.compile(r'.*\(hw:(\d+),(\d+)\)')
+    # Iterate across all Pyaudio devices
     for i in range(p.get_device_count()):
         devinfo = p.get_device_info_by_index(i)
-        if devname in devinfo['name']:
-            return i
-    return None
-
-def find_alsa_card_by_name(devname):
-    p = pyaudio.PyAudio()
-    regex = re.compile(r'.*\(\D+:(\d+),\d+\)')
-    for i in range(p.get_device_count()):
-        devinfo = p.get_device_info_by_index(i)
+        # Only accept ALSA devices that match (hw:X,Y)
         match = regex.match(devinfo['name'])
-        if devname in devinfo['name'] and match is not None:
-            return int(match.group(1))
-    return None
+        if match is None:
+            continue
+        devinfo['alsa_card'] = int(match.group(1))
+        devinfo['alsa_device'] = int(match.group(2))
+        blacklist_skip = False
+        for blacklisted_name in blacklist:
+            if blacklisted_name in devinfo['name']:
+                blacklist_skip = True
+                break
+        if blacklist_skip:
+            continue
+        # Recording devices must have at least one InputChannel
+        if record and devinfo['maxInputChannels'] > 0:
+            devices.append(devinfo)
+        # Playback devices must have at least one OutputChannel
+        elif playback and devinfo['maxOutputChannels'] > 0:
+            devices.append(devinfo)
+    return devices
+
+# Default list of amixer simple controls that will be set automatically by set_volume
+CONTROLS = [
+    'PCM', 'Speaker', 'Headphone', 'Line', 'Mic', 'Capture', 'Digital',
+]
+
+def set_volume(alsa_card, volume, controls=None):
+    ''' Set volume of ALL inputs or outputs of alsa_card to volume
+     Volume should be an integer 0-100
+      controls may be a  list of controls to set, defaults to an expansive list of defaults '''
+    if controls is None:
+        controls = CONTROLS
+    elif isinstance(controls, str):
+        controls = controls
+    controls_raw = subprocess.run(
+        ['/usr/bin/amixer', '-c', str(alsa_card), 'scontrols'],
+        capture_output=True, text=True).stdout
+    found_controls = re.findall(r"^Simple mixer control '(.*)',(\d+)", controls_raw, flags=re.MULTILINE)
+    # Always try to set Master level to 100%
+    if 'Master' in [x[0] for x in found_controls]:
+        ret = subprocess.run(['/usr/bin/amixer', '-c', str(alsa_card), 'sset', 'Master', '100%'], capture_output=True, text=True)
+        if ret.returncode != 0:
+            logging.error(f'Unable to set Master volume for card {alsa_card}: {ret.stderr}')
+    set_one = False
+    for control, idx in found_controls:
+        if control in controls:
+            set_one = True
+            ret = subprocess.run(['/usr/bin/amixer', '-c', str(alsa_card), 'sset', control, f'{volume}%'], capture_output=True, text=True)
+            if ret.returncode != 0:
+                logging.error(f'Unable to set {control} volume for card {alsa_card}: {ret.stderr}')
+    if not set_one:
+        logging.warning(f'Volume not set: No controls for card {alsa_card} matched: {found_controls}')
+
+
 
 class AudioRecorder:
-    def __init__(self, device_idx=0, devname=None, rate=16000, channels=1, frames_per_buffer=1024):
+    def __init__(self, device_idx=0, channels=1, frames_per_buffer=1024):
         self.logger = logging.getLogger(__name__)
-        self.rate = rate
         self.channels = channels
         self.frames_per_buffer = frames_per_buffer
         with noalsaerr():
             self.p = pyaudio.PyAudio()
-        self.device_idx = device_idx,
-        if devname is not None:
-            newidx = find_pyaudio_idx_by_name(devname)
-            if newidx is not None:
-                self.device_idx = newidx
+        self.device_idx = device_idx
         self.stream = None
         self.frames = []
         self.thread = threading.Thread()
         self.recording = False
+
+        self.rate = 16000  # Default rate, will be updated to a supported rate
+        # List of common rates to test 
+        # Hardware usually natively supports multiples of 44100 or 48000
+        test_rates = [16000, 22050, 32000, 44100, 48000, 88200, 96000, 192000]
+
+        # Automatically select smallest supported sample rate
+        # pyaudio doesn't provide a way to do this upfront, it only reports a default sample rate
+        for rate in test_rates:
+            try:
+                # Change 'input_channels' and 'input_format' if doing stereo or float recording
+                if self.p.is_format_supported(
+                    rate=rate, 
+                    input_device=device_idx, 
+                    input_channels=channels,
+                    input_format=pyaudio.paInt16
+                ):
+                    self.rate = rate
+                    break
+            except ValueError:
+                continue
 
     def start(self):
         self.logger.debug('Opening device index %s for recording', self.device_idx)

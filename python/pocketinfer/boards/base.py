@@ -75,9 +75,9 @@ class Board:
     V4L_CAMERA_INTERFACE = 'usb'
     ALSA_CAPTURE_NAME = ''
     ALSA_PLAYBACK_NAME = ''
-    ALSA_CAPTURE_RATE = 16000
     ALSA_CAPTURE_CHANNEL_NAME = "Mic"
     ALSA_PLAYBACK_CHANNEL_NAME = "Speaker"
+    ALSA_DEVNAME_BLACKLIST = ['NVIDIA Jetson Orin Nano APE']
 
     def __init__(self, args):
         self.logger = logging.getLogger(__name__)
@@ -89,13 +89,43 @@ class Board:
             camera_name=self.V4L_CAMERA_NAME,
             camera_interface=self.V4L_CAMERA_INTERFACE
         )
-        self.audio = audio.AudioRecorder(devname=self.ALSA_CAPTURE_NAME, rate=self.ALSA_CAPTURE_RATE, frames_per_buffer=4096)
-        self.ALSA_CAPTURE_CARD = audio.find_alsa_card_by_name(self.ALSA_CAPTURE_NAME)
-        self.ALSA_PLAYBACK_CARD = audio.find_alsa_card_by_name(self.ALSA_PLAYBACK_NAME)
-        self.ALSA_PLAYBACK_DEVICE = f'hw:{self.ALSA_PLAYBACK_CARD},0'
-        self.logger.debug('Detected ALSA capture card index: %s, Detected ALSA playback card index: %s', self.ALSA_CAPTURE_CARD, self.ALSA_PLAYBACK_CARD)
-        system(f'amixer -c {self.ALSA_CAPTURE_CARD} sset {self.ALSA_CAPTURE_CHANNEL_NAME} 100% > /dev/null')
-        system(f'amixer -c {self.ALSA_PLAYBACK_CARD} sset {self.ALSA_PLAYBACK_CHANNEL_NAME} 100% > /dev/null')
+        # Select audio capture device - try to use ALSA_CAPTURE_NAME if provided, apply blasklist, fall back on any available capture device
+        capture_devices = audio.alsa_devices_filtered(record=True, blacklist=self.ALSA_DEVNAME_BLACKLIST)
+        capture_device = None
+        if self.ALSA_CAPTURE_NAME != '':
+            for dev in capture_devices:
+                if self.ALSA_CAPTURE_NAME in dev['name']:
+                    capture_device = dev
+                    break
+        if capture_device is None and len(capture_devices) > 0:
+            self.logger.warning(f"Capture device '{self.ALSA_CAPTURE_NAME}' not found, defaulting to first available device '{capture_devices[0]['name']}'")
+            capture_device = capture_devices[0]
+        if capture_device is None:
+            self.logger.error(f"No capture devices found, please check your audio input device")
+
+        # Select audio playback device - try to use ALSA_PLAYBACK_NAME if provided, apply blasklist, fall back on any available capture device
+        playback_devices = audio.alsa_devices_filtered(playback=True, blacklist=self.ALSA_DEVNAME_BLACKLIST)
+        playback_device = None
+        if self.ALSA_PLAYBACK_NAME != '':
+            for dev in playback_devices:
+                if self.ALSA_PLAYBACK_NAME in dev['name']:
+                    playback_device = dev
+                    break
+        if playback_device is None and len(playback_devices) > 0:
+            self.logger.warning(f"Playback device '{self.ALSA_PLAYBACK_NAME}' not found, defaulting to first available device '{playback_devices[0]['name']}'")
+            playback_device = playback_devices[0]
+        if playback_device is None:
+            self.logger.error(f"No playback devices found, please check your audio output device")
+
+        self.logger.debug('Capture device: %s, Playback device: %s', capture_device, playback_device)
+        self.audio = audio.AudioRecorder(device_idx=capture_device['index'] if capture_device else 0, frames_per_buffer=4096)
+        self.alsa_capture_card = capture_device['alsa_card'] if capture_device else None 
+        self.alsa_playback_card = playback_device['alsa_card'] if playback_device else None
+        _alsa_playback_device = playback_device['alsa_device'] if playback_device else None
+        self.alsa_playback_device = f'hw:{self.alsa_playback_card},{_alsa_playback_device}'
+        # Try to crank up volume on recording and playback devices
+        audio.set_volume(self.alsa_capture_card, 100)
+        audio.set_volume(self.alsa_playback_card, 100)
         self.ui_cbs = []
 
     def subscribe_to_ui(self, func):
