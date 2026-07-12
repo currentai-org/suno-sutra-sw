@@ -31,7 +31,7 @@ class HearTheWorldEn(BaseApplication):
     def start(self):
         # Load any models or resources needed for the application
         self.piper = Piper(voice_name=self.METADATA["models"]["piper"]["voice_name"],
-                           audio_device=self.board.ALSA_PLAYBACK_DEVICE)
+                           audio_device=self.board.alsa_playback_device)
         self.vosk = Vosk(model_name=self.METADATA["models"]["vosk"]["model_name"])
         self.ollama = Ollama(model_name=self.METADATA["models"]["ollama"]["model_name"])
         # Proceed with running the application in it's own thread

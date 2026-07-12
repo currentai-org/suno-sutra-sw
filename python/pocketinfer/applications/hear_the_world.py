@@ -50,7 +50,7 @@ class HearTheWorld(BaseApplication):
     def start(self):
         # Load any models or resources needed for the application
         self.piper = Piper(voice_name=self.METADATA["models"]["piper"]["voice_name"],
-                           audio_device=self.board.ALSA_PLAYBACK_DEVICE)
+                           audio_device=self.board.alsa_playback_device)
         self.vosk = Vosk(model_name=self.METADATA["models"]["vosk"]["model_name"])
         self.ollama = Ollama(model_name=self.METADATA["models"]["ollama"]["model_name"])
         self.asr = Asr()
@@ -166,7 +166,7 @@ class HearTheWorld(BaseApplication):
                 # self.piper.start_playback(result)
                 app_end = time.time()
                 wave_obj = wave.open(BytesIO(tts_result_bytes), 'rb')
-                with AudioPlayer(wave_obj.getframerate(), self.board.ALSA_PLAYBACK_DEVICE) as player:
+                with AudioPlayer(wave_obj.getframerate(), self.board.alsa_playback_device) as player:
                     player.play(wave_obj.readframes(wave_obj.getnframes()))
                 self.logger.debug(f"Total Run time {app_end-audio_start}s, audio {audio_stop-audio_start}s, ASR {asr_stop-asr_start}, NMT A {nmt_a_stop-asr_stop}, LLM {llm_end-llm_start}, NMT B {nmt_b_stop-llm_end}, TTS {app_end-nmt_b_stop}")
                 # Log
