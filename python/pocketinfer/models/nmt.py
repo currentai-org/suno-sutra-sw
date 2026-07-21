@@ -1,9 +1,15 @@
 import requests
 
+from pocketinfer.models.base import BaseSystemdModel, register_model
 
-class Nmt:
+
+@register_model
+class Nmt(BaseSystemdModel):
+    SYSTEMD_SERVICE = 'bhashini_model.service'
+    BASE_URL = 'http://localhost:11400/health'
+
     def __init__(self):
-        pass
+        super().__init__()
 
     def infer(self, text: str, source_lang: str, target_lang: str):
         payload = {
@@ -19,27 +25,6 @@ class Nmt:
         else:
             raise RuntimeError(f"NMT inference failed: {response.text}")
 
-    @classmethod
-    def verify(cls, args):
-        # For NMT, we can do a simple health check by sending a test translation request
-        try:
-            response = requests.get("http://localhost:11400/health")
-            if response.status_code == 200:
-                return True, "NMT service is available."
-        except requests.exceptions.ConnectionError:
-            print("Connection Error, trying to launch model")
-        check_output('systemctl restart bhashini_models.service', shell=True)
-        start = time.time()
-        while time.time() - start < 60.0:
-            try:
-                response = requests.get("http://localhost:11400/health")
-                if response.status_code == 200:
-                    return True, "NMT service is available."
-            except requests.exceptions.ConnectionError:
-                pass
-            time.sleep(0.25)
-        return False, f"NMT service responded with status code {response.status_code}."
-        
     @classmethod
     def update(cls, args):
         return True, "OK"

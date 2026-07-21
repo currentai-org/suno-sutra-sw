@@ -1,12 +1,16 @@
 import requests
 import base64
-import time
-from subprocess import check_output
+
+from pocketinfer.models.base import BaseSystemdModel, register_model
 
 
-class Asr:
+@register_model
+class Asr(BaseSystemdModel):
+    SYSTEMD_SERVICE = 'bhashini_model.service'
+    BASE_URL = 'http://localhost:11400/health'
+
     def __init__(self):
-        pass
+        super().__init__()
 
     def infer(self, wav_bytes: bytes, language: str):
 
@@ -24,27 +28,6 @@ class Asr:
         else:
             raise RuntimeError(f"ASR inference failed: {response.text}")
 
-    @classmethod
-    def verify(cls, args):
-        # For ASR, we can do a simple health check by sending an empty audio and expecting an error response
-        try:
-            response = requests.get("http://localhost:11400/health")
-            if response.status_code == 200:
-                return True, "ASR service is available."
-        except requests.exceptions.ConnectionError:
-            print("Connection Error, trying to launch model")
-        check_output('systemctl restart bhashini_models.service', shell=True)
-        start = time.time()
-        while time.time() - start < 60.0:
-            try:
-                response = requests.get("http://localhost:11400/health")
-                if response.status_code == 200:
-                    return True, "ASR service is available."
-            except requests.exceptions.ConnectionError:
-                pass
-            time.sleep(0.25)
-        return False, f"ASR service responded with status code {response.status_code}."
-        
     @classmethod
     def update(cls, args):
         return True, "OK"

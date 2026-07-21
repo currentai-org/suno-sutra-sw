@@ -8,15 +8,18 @@ from appdirs import user_cache_dir
 from pathlib import Path
 from typing import TypedDict, cast
 
+from pocketinfer.models.base import BaseModel, register_model
+
 
 class VoskResponse(TypedDict):
     text: str
 
-class Vosk:
+@register_model
+class Vosk(BaseModel):
     MODEL_DIR = Path(user_cache_dir("pocketinfer")) / "vosk_model"
 
     def __init__(self, model_name):
-        self.logger = logging.getLogger(__name__)
+        super().__init__()
         self.model_name = model_name
         self.model_path = os.path.join(self.MODEL_DIR, model_name)
 

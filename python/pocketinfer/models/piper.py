@@ -7,12 +7,15 @@ import logging
 from pathlib import Path
 from appdirs import user_cache_dir
 
+from pocketinfer.models.base import BaseModel, register_model
 
-class Piper:
+
+@register_model
+class Piper(BaseModel):
     MODEL_DIR = Path(user_cache_dir("pocketinfer")) / "piper_voice"
 
     def __init__(self, voice_name, audio_device):
-        self.logger = logging.getLogger(__name__)
+        super().__init__()
         self.voice_name = voice_name
         self.audio_device = audio_device
         self.voice = PiperVoice.load(model_path=Path(self.MODEL_DIR, voice_name + ".onnx"),

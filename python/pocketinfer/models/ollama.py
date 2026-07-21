@@ -3,10 +3,13 @@ import logging
 from subprocess import check_output
 import requests
 
+from pocketinfer.models.base import BaseModel, register_model
 
-class Ollama:
+
+@register_model
+class Ollama(BaseModel):
     def __init__(self, model_name: str):
-        self.logger = logging.getLogger(__name__)
+        super().__init__()
         self.model_name = model_name
         #TODO execute curl http://localhost:11434/api/generate -d '{"model": model_name, "keep_alive": -1}'
 
