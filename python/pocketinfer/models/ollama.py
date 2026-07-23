@@ -3,15 +3,17 @@ import logging
 from subprocess import check_output
 import requests
 
-from pocketinfer.models.base import BaseModel, register_model
+from pocketinfer.models.base import BaseSystemdModel, register_model, ModelNotFoundError
 
 
 @register_model
-class Ollama(BaseModel):
+class Ollama(BaseSystemdModel):
+    SYSTEMD_SERVICE = 'ollama.service'
+    BASE_URL = 'http://localhost:11434'
+
     def __init__(self, model_name: str):
         super().__init__()
         self.model_name = model_name
-        #TODO execute curl http://localhost:11434/api/generate -d '{"model": model_name, "keep_alive": -1}'
 
     def chat(self, messages: list) -> ollama.ChatResponse:
         return ollama.chat(model=self.model_name, messages=messages)
@@ -21,19 +23,37 @@ class Ollama(BaseModel):
 
     def restart(self):
         print(check_output('systemctl restart ollama', shell=True))
-        requests.post('http://localhost:11434/api/generate', json={'model': self.model_name, 'keep_alive': -1})
+        requests.post(f'{self.BASE_URL}/api/generate', json={'model': self.model_name, 'keep_alive': -1})
+
+    def load_model(self, model_name: str):
+        ret = ollama.list()
+        models = []
+        for model in ret.models:
+            if model.model is not None:
+                models.append(model.model)
+            if model.model == model_name:
+                requests.post(f'{self.BASE_URL}/api/generate', json={'model': model_name, 'keep_alive': -1})
+                self.model_name = model_name
+                return
+        raise ModelNotFoundError(f"Model '{model_name}' not found.", models)
+    
+    def unload_model(self):
+        requests.post(f'{self.BASE_URL}/api/generate', json={'model': self.model_name, 'keep_alive': 0})
+        self.model_name = None
     
     @classmethod
     def verify(cls, args):
+        if not super().verify(args):
+            return False
         try:
             ret = ollama.list()
             for model in ret.models:
                 if model.model == args["model_name"]:
-                    requests.post('http://localhost:11434/api/generate', json={'model': args['model_name'], 'keep_alive': -1})
-                    return True, "Ollama service is available."
-            return False, f"Model '{args['model_name']}' not found."
+                    requests.post(f'{cls.BASE_URL}/api/generate', json={'model': args['model_name'], 'keep_alive': -1})
+                    return True
+            return False
         except Exception as e:
-            return False, str(e)
+            return False
 
     @classmethod
     def update(cls, args):

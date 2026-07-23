@@ -6,7 +6,7 @@ from pocketinfer.models.base import BaseSystemdModel, register_model
 @register_model
 class Tts(BaseSystemdModel):
     SYSTEMD_SERVICE = 'bhashini_model.service'
-    BASE_URL = 'http://localhost:11400/health'
+    BASE_URL = 'http://localhost:11400'
 
     def __init__(self):
         super().__init__()
@@ -17,7 +17,7 @@ class Tts(BaseSystemdModel):
             "language": language
         }
 
-        response = requests.post("http://localhost:11400/tts", json=payload)
+        response = requests.post(f"{self.BASE_URL}/tts", json=payload)
 
         if response.status_code == 200:
             return response.json()

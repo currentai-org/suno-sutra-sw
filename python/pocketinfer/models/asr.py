@@ -7,7 +7,7 @@ from pocketinfer.models.base import BaseSystemdModel, register_model
 @register_model
 class Asr(BaseSystemdModel):
     SYSTEMD_SERVICE = 'bhashini_model.service'
-    BASE_URL = 'http://localhost:11400/health'
+    BASE_URL = 'http://localhost:11400'
 
     def __init__(self):
         super().__init__()
@@ -21,12 +21,20 @@ class Asr(BaseSystemdModel):
             "audio_base64": audio_base64
         }
 
-        response = requests.post("http://localhost:11400/asr", json=payload)
+        response = requests.post(f"{self.BASE_URL}/asr", json=payload)
 
         if response.status_code == 200:
             return response.json()
         else:
             raise RuntimeError(f"ASR inference failed: {response.text}")
+
+    def load_model(self, model_name: str):
+        # Model loaded automatically on service startup, cannot be changed.
+        pass
+    
+    def unload_model(self):
+        # Model cannot be changed.
+        pass
 
     @classmethod
     def update(cls, args):
