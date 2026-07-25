@@ -1,3 +1,6 @@
+from collections.abc import Mapping, Sequence
+from typing import Any, Optional, Union
+
 import ollama
 import logging
 from subprocess import check_output
@@ -15,15 +18,15 @@ class Ollama(BaseSystemdModel):
         super().__init__()
         self.model_name = model_name
 
-    def chat(self, messages: list) -> ollama.ChatResponse:
+    def chat(self, messages: Sequence[Mapping[str, Any] | ollama.Message]) -> ollama.ChatResponse:
+        if self.model_name is None:
+            raise ValueError("No model loaded")
         return ollama.chat(model=self.model_name, messages=messages)
 
-    def generate(self, images, prompt):
+    def generate(self, prompt: str, images: Optional[Sequence[Union[str, bytes, ollama.Image]]] = None) -> ollama.GenerateResponse:
+        if self.model_name is None:
+            raise ValueError("No model loaded")
         return ollama.generate(model=self.model_name, images=images, prompt=prompt)
-
-    def restart(self):
-        print(check_output('systemctl restart ollama', shell=True))
-        requests.post(f'{self.BASE_URL}/api/generate', json={'model': self.model_name, 'keep_alive': -1})
 
     def load_model(self, model_name: str):
         ret = ollama.list()

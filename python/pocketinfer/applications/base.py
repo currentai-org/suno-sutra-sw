@@ -49,15 +49,15 @@ class BaseApplication:
             package = importlib.import_module(f"pocketinfer.models.{model}")
             model_class = getattr(package, model.capitalize())
             verify_func = getattr(model_class, "verify")
-            success, message = verify_func(models[model])
+            success = verify_func(models[model])
             if not success:
                 # Try to manually update
                 update_func = getattr(model_class, "update")
                 update_func(models[model])
                 # Re-verify
-                success, message = verify_func(models[model])
+                success = verify_func(models[model])
                 if not success:
-                    raise RuntimeError(f"Model dependency verification failed for {model}: {message}")
+                    raise RuntimeError(f"Model dependency verification failed for {model}")
         return True
     @classmethod
 

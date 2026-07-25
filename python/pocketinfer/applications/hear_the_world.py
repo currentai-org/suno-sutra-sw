@@ -5,9 +5,7 @@ from pocketinfer.applications.registry import RegisterApplication
 from pocketinfer.models.ollama import Ollama
 from pocketinfer.models.piper import Piper
 from pocketinfer.models.vosk import Vosk
-from pocketinfer.models.asr import Asr
-from pocketinfer.models.nmt import Nmt
-from pocketinfer.models.tts import Tts
+from pocketinfer.models.bhashini import Bhashini
 
 from pocketinfer.audio import AudioPlayer
 
@@ -36,9 +34,7 @@ import threading
         # "ollama": {"model_name": "ministral-3:3B"},
         "piper": {"voice_name": "en_US-lessac-medium"},
         "vosk": {"model_name": "vosk-model-small-en-us-0.15"},
-        "asr": {},
-        "nmt": {},
-        "tts": {},
+        "bhashini": {},
     },
     "default_settings": {
         "input_language": "en",
@@ -53,9 +49,7 @@ class HearTheWorld(BaseApplication):
                            audio_device=self.board.alsa_playback_device)
         self.vosk = Vosk(model_name=self.METADATA["models"]["vosk"]["model_name"])
         self.ollama = Ollama(model_name=self.METADATA["models"]["ollama"]["model_name"])
-        self.asr = Asr()
-        self.nmt = Nmt()
-        self.tts = Tts()
+        self.bhashini = Bhashini()
         self.board.subscribe_to_ui(self.ui_cb)
         # Proceed with running the application in it's own thread
         if not os.path.exists("/tmp/hear_the_world_en_logs"):
@@ -124,44 +118,46 @@ class HearTheWorld(BaseApplication):
                 # Perform ASR on the recorded audio, convert it to text
                 if self.settings["input_language"] != 'en':
                     wav_bytes = self.board.audio.to_audio_data().get_wav_data()
-                    asr_result = self.asr.infer(wav_bytes, self.settings["input_language"])
+                    asr_result = self.bhashini.asr(wav_bytes, self.settings["input_language"])['text']
                 else:
-                    asr_result = self.vosk.recognize(self.board.audio.to_audio_data())
-                raw_query = asr_result['text']
+                    asr_result = self.vosk.recognize(self.board.audio.to_audio_data())['text']
                 asr_stop = time.time()
-                self.logger.info("Detected query is '{}'".format(raw_query))
-                self.board.top_text(raw_query)
+                self.logger.info("Detected query is '{}'".format(asr_result))
+                self.board.top_text(asr_result)
                 # Perform NMT on the recognized text, convert it to the target language
                 if self.settings['input_language'] != 'en':
                     self.board.statusbar(f"Running: NMT {self.settings['input_language']} -> en")
-                    query = self.nmt.infer(raw_query, self.settings["input_language"], "EN")['translated_text']
+                    query = self.bhashini.nmt(asr_result, self.settings["input_language"], "EN")['translated_text']
                     self.logger.info("Translated query is '{}'".format(query))
                     self.delayed_write_toptext(query, delay=2.0)
                 else:
-                    query = raw_query
+                    query = asr_result
                 nmt_a_stop = time.time()
                 # Perform LLM inference on the recognized text + image
                 self.board.statusbar("Running: LLM")
                 llm_start = time.time()
                 resp = self.ollama.generate(images=[img], prompt=query+'. Limit response to one short sentence')
                 llm_end = time.time()
+                if resp.response is None:
+                    self.board.bottom_text("No response")
+                    continue
                 result = resp.response.strip().rstrip()
                 self.logger.info("Result is '{}'".format(result))
                 self.board.bottom_text(result)
                 # Perform NMT on the LLM response, convert it back to the original language
                 if self.settings['output_language'] != 'en':
                     self.board.statusbar(f"Running: NMT en -> {self.settings['output_language']}")
-                    nmt_result = self.nmt.infer(result, "EN", self.settings["output_language"])['translated_text']
+                    nmt_result = self.bhashini.nmt(result, "EN", self.settings["output_language"])['translated_text']
                     self.logger.info("Translated result is '{}'".format(nmt_result))
                 else:
                     nmt_result = result
                 nmt_b_stop = time.time()
-                self.delayed_write_toptext(raw_query)
+                self.delayed_write_toptext(asr_result)
                 self.delayed_write_bottext(nmt_result)
                 # Perform TTS on the LLM response, convert it to audio and play it back
                 self.board.statusbar("Running: Playback")
                 self.delayed_write_led_anim(0)
-                tts_result = self.tts.infer(nmt_result, self.settings["output_language"])
+                tts_result = self.bhashini.tts(nmt_result, self.settings["output_language"])
                 tts_result_bytes = base64.b64decode(tts_result['audio_base64'])
                 # self.piper.start_playback(result)
                 app_end = time.time()

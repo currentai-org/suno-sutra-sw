@@ -23,7 +23,7 @@ class Vosk(BaseModel):
         self.model_name = model_name
         self.model_path = os.path.join(self.MODEL_DIR, model_name)
 
-    def recognize(self, audio_data: AudioData, verbose: bool = False) -> str:
+    def recognize(self, audio_data: AudioData) -> VoskResponse:
         if not os.path.exists(self.model_path):
             raise RuntimeError(
                 f"Vosk model not found at {self.model_path}. "
@@ -40,8 +40,6 @@ class Vosk(BaseModel):
         final_recognition: str = rec.FinalResult()
 
         result = cast(VoskResponse, json.loads(final_recognition))
-        if verbose:
-            return result
 
         return result
 
@@ -50,8 +48,8 @@ class Vosk(BaseModel):
     def verify(cls, args):
         path = os.path.join(cls.MODEL_DIR, args["model_name"])
         if not os.path.exists(path):
-            return False, f"Vosk model not found at {path}"
-        return True, "Vosk model is available."
+            return False
+        return True
 
     @classmethod
     def update(cls, args):
