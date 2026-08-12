@@ -70,7 +70,6 @@ def main():
     board.statusbar("Starting: {}...".format(args.app))
     board.button_led(False)
 
-    app_cls.verify_dependencies()
     logging.info(f"Starting application: {args.app}")
     board.mode_text(f"App {args.app}")
     app = app_cls(board, settings=settings)

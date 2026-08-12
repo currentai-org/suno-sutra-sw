@@ -19,6 +19,8 @@ import json
 import sys
 import threading
 
+from pocketinfer.models.base import ModelState
+
 
 # Register this class as an application that can run on the Pocket Infer Device
 # The argument here is a dictionary of metadata about the application
@@ -44,6 +46,7 @@ import threading
 })
 class HearTheWorld(BaseApplication):
     def start(self):
+        self.manager.subscribe_to_state_change(self.model_state_changed)
         # Load any models or resources needed for the application
         self.piper = Piper(voice_name=self.METADATA["models"]["piper"]["voice_name"],
                            audio_device=self.board.alsa_playback_device)
@@ -55,6 +58,30 @@ class HearTheWorld(BaseApplication):
         if not os.path.exists("/tmp/hear_the_world_en_logs"):
             os.makedirs("/tmp/hear_the_world_en_logs")
         super().start()
+
+    def model_state_changed(self, model_name, new_state, prev_state):
+        self.logger.debug("Model state changed: %s from %s to %s", model_name, prev_state, new_state)
+        if model_name == 'Ollama':
+            model = self.ollama
+        elif model_name == 'Bhashini':
+            model = self.bhashini
+        else:
+            # Do not process any other events
+            return
+
+        # If Ollama or Bhashini service failed or was stopped:
+        if new_state == ModelState.STOPPED or new_state == ModelState.ERROR:
+            self.logger.warning(f"Model {model_name} stopped or encountered an error, forcing a restart")
+            if model_name == 'Ollama':
+                # Force unload the model, since we know the service is down
+                self.ollama.model_name = None
+            model.service_restart()
+        # If Ollama or Bhashini service just came online:
+        elif new_state == ModelState.RUNNING:
+            if model_name == 'Ollama':
+                model_name = self.METADATA['models']['ollama']['model_name']
+                self.logger.info(f'Ollama service just started, loading model {model_name}')
+                self.ollama.load_model(model_name)
 
     def ui_cb(self, msg):
         if msg == 'Reset':
@@ -71,34 +98,20 @@ class HearTheWorld(BaseApplication):
         elif msg.startswith('TTS'):
             self.settings['output_language'] = msg[4:].lower()
 
-    def delayed_write_toptext(self, text, delay=1.0):
-        def delayed_write(text, delay):
-            time.sleep(delay)
-            self.board.top_text(text)
-        th = threading.Thread(target=delayed_write, args=(text, delay), daemon=True)
-        th.start()
-
-    def delayed_write_bottext(self, text, delay=1.0):
-        def delayed_write(text, delay):
-            time.sleep(delay)
-            self.board.bottom_text(text)
-        th = threading.Thread(target=delayed_write, args=(text, delay), daemon=True)
-        th.start()
-
-    def delayed_write_led_anim(self, val, delay=1.0):
-        def delayed_write(val, delay):
-            time.sleep(delay)
-            self.board.led_animation(val)
-        th = threading.Thread(target=delayed_write, args=(val, delay), daemon=True)
-        th.start()
-
-
     def run(self):
         self.logger.debug('Starting with settings: %s', self.settings)
         while self.running:
             try:
+                # Verifying services are running
+                if not self.manager.check_state('Ollama') == ModelState.RUNNING:
+                    self.board.statusbar("Waiting for Ollama service...")
+                    self.ollama.service_restart()
+                    self.manager.wait_for('Ollama')
+                if not self.manager.check_state('Bhashini') == ModelState.RUNNING:
+                    self.board.statusbar("Waiting for Bhashini service...")
+                    self.bhashini.service_restart()
+                    self.manager.wait_for('Bhashini')
                 self.board.statusbar("Ready - Press Button")
-                # self.board.UI.force_refresh()
                 self.board.wait_for_trigger_button_down()
                 self.board.statusbar("Release Button")
                 self.board.top_text("")
@@ -129,7 +142,7 @@ class HearTheWorld(BaseApplication):
                     self.board.statusbar(f"Running: NMT {self.settings['input_language']} -> en")
                     query = self.bhashini.nmt(asr_result, self.settings["input_language"], "EN")['translated_text']
                     self.logger.info("Translated query is '{}'".format(query))
-                    self.delayed_write_toptext(query, delay=2.0)
+                    self.board.top_text(query)
                 else:
                     query = asr_result
                 nmt_a_stop = time.time()
@@ -152,11 +165,11 @@ class HearTheWorld(BaseApplication):
                 else:
                     nmt_result = result
                 nmt_b_stop = time.time()
-                self.delayed_write_toptext(asr_result)
-                self.delayed_write_bottext(nmt_result)
+                self.board.top_text(asr_result)
+                self.board.bottom_text(nmt_result)
                 # Perform TTS on the LLM response, convert it to audio and play it back
                 self.board.statusbar("Running: Playback")
-                self.delayed_write_led_anim(0)
+                self.board.led_animation(0)
                 tts_result = self.bhashini.tts(nmt_result, self.settings["output_language"])
                 tts_result_bytes = base64.b64decode(tts_result['audio_base64'])
                 # self.piper.start_playback(result)

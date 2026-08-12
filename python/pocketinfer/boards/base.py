@@ -258,5 +258,5 @@ class DummyBoard(Board):
                 raise FileNotFoundError(f"DummyBoard image file '{img}' not found")
             return cv2.imread(img)
         if isinstance(img, bytes):
-            return cv2.imdecode(img, cv2.IMREAD_COLOR)
+            return cv2.imdecode(img, cv2.IMREAD_COLOR) # type: ignore
         return img

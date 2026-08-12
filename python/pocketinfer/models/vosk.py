@@ -44,20 +44,18 @@ class Vosk(BaseModel):
         return result
 
     
-    @classmethod
-    def verify(cls, args):
-        path = os.path.join(cls.MODEL_DIR, args["model_name"])
+    def verify(self):
+        path = os.path.join(self.MODEL_DIR, self.model_name)
         if not os.path.exists(path):
             return False
         return True
 
-    @classmethod
-    def update(cls, args):
-        path = os.path.join(cls.MODEL_DIR, args["model_name"])
+    def update(self, args):
+        path = os.path.join(self.MODEL_DIR, args["model_name"])
         if not os.path.exists(path):
             os.makedirs(path)
         logging.info(f"Downloading Vosk model '{args['model_name']}'")
         download_vosk_model(
             f"https://alphacephei.com/vosk/models/{args['model_name']}.zip",
             path
-        ) 
+        )
