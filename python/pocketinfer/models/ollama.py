@@ -21,7 +21,7 @@ class Ollama(BaseSystemdModel):
         self.model_name = None
         if model_name is not None:
             # Do not block waiting for model to be loaded
-            th = threading.Thread(target=self.load_model, args=(model_name,), daemon=True)
+            th = threading.Thread(target=self._quiet_load_model, args=(model_name,), daemon=True)
             th.start()
 
     def chat(self, messages: Sequence[Mapping[str, Any] | ollama.Message]) -> ollama.ChatResponse:
@@ -45,7 +45,21 @@ class Ollama(BaseSystemdModel):
     def model_loaded(self) -> bool:
         return self.model_name is not None
 
+    def _quiet_load_model(self, model_name: str, timeout: Optional[float] = None):
+        try:
+            self.load_model(model_name, timeout=timeout)
+            return True
+        except Exception:
+            return False
+
     def load_model(self, model_name: str, timeout: Optional[float] = None):
+        # First check currently loaded models
+        ret = ollama.ps()
+        for model in ret.models:
+            if model.model == model_name:
+                self.model_name = model_name
+                return
+        # Next, check to see if model is available
         ret = ollama.list()
         models = []
         for model in ret.models:

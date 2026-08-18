@@ -42,12 +42,14 @@ class ModelManager:
     This class will do so automatically, any model instances will be tracked and memory usage managed.
     It will also provide helpers to ensure all models are ready to go before continuing application execution"""
 
-    def __init__(self, timeout=10.0):
+    def __init__(self, timeout=1.0, swap_increase_threshold_mb=100.0):
         self.logger = logging.getLogger(self.__class__.__module__)
         self.running = False
         self.timeout = timeout
         self.thread = threading.Thread()
         self.cbs = []
+        self.swap_increase_threshold_mb = swap_increase_threshold_mb
+        self.last_swap_used_mb = None
 
     def subscribe_to_state_change(self, cb):
         if cb not in self.cbs:
@@ -62,6 +64,13 @@ class ModelManager:
             self.running = True
             self.thread = threading.Thread(target=self.run, daemon=True)
             self.thread.start()
+            self.swap_thread = threading.Thread(target=self.run_swapcheck, daemon=True)
+            self.swap_thread.start()
+
+    def run_swapcheck(self):
+        while self.running:
+            self.check_swap_usage()
+            time.sleep(self.timeout)
 
     def run(self):
         while self.running:
@@ -77,7 +86,36 @@ class ModelManager:
                             self.logger.exception(f"Error in state change callback: {str(e)}")
             if signalled:
                 MODEL_EVT.clear()
-    
+
+    def check_swap_usage(self):
+        """Read swap usage from /proc/meminfo and log an error if it has grown by more than
+        swap_increase_threshold_mb since the last check."""
+        try:
+            swap_used_mb = self.get_swap_used_mb()
+        except Exception as e:
+            self.logger.exception(f"Failed to read swap usage from /proc/meminfo: {str(e)}")
+            return
+        if self.last_swap_used_mb is not None:
+            swap_increase_mb = swap_used_mb - self.last_swap_used_mb
+            if swap_increase_mb >= self.swap_increase_threshold_mb:
+                self.logger.error(
+                    f"System is swapping: swap usage increased by {swap_increase_mb:.2f} MB "
+                    f"(now {swap_used_mb:.2f} MB) since the last check. Model services may become unreliable."
+                )
+        self.last_swap_used_mb = swap_used_mb
+
+    @staticmethod
+    def get_swap_used_mb() -> float:
+        """Return the amount of RAM currently moved to swap, in MB, using /proc/meminfo."""
+        meminfo = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                key, _, value = line.partition(":")
+                meminfo[key.strip()] = value.strip()
+        swap_total_kb = int(meminfo["SwapTotal"].split()[0])
+        swap_free_kb = int(meminfo["SwapFree"].split()[0])
+        return (swap_total_kb - swap_free_kb) / 1024
+
     def check_state(self, model_name: str) -> ModelState:
         """Check the current state of a specific model."""
         for model in MODEL_INSTANCES:

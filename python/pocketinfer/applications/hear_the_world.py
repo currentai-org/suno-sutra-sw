@@ -32,7 +32,6 @@ from pocketinfer.models.base import ModelState
     "version": "0.1.0",
     "models": {
         "ollama": {"model_name": "qwen3-vl:2b"},
-        # "ollama": {"model_name": "moondream:1.8B"},
         # "ollama": {"model_name": "ministral-3:3B"},
         "piper": {"voice_name": "en_US-lessac-medium"},
         "vosk": {"model_name": "vosk-model-small-en-us-0.15"},
@@ -105,11 +104,9 @@ class HearTheWorld(BaseApplication):
                 # Verifying services are running
                 if not self.manager.check_state('Ollama') == ModelState.RUNNING:
                     self.board.statusbar("Waiting for Ollama service...")
-                    self.ollama.service_restart()
                     self.manager.wait_for('Ollama')
                 if not self.manager.check_state('Bhashini') == ModelState.RUNNING:
                     self.board.statusbar("Waiting for Bhashini service...")
-                    self.bhashini.service_restart()
                     self.manager.wait_for('Bhashini')
                 self.board.statusbar("Ready - Press Button")
                 self.board.wait_for_trigger_button_down()
