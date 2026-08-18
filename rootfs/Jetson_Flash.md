@@ -42,7 +42,13 @@ The USB-C cable should be connected to a Ubuntu 22.x or 24.x PC, or to a windows
 
 ### Flashing using SDK Manager
 
-SDK Manager requires a Ubuntu 22.04 or 24.04 PC in order to directly flash a Jetson board. There is some reported support for doing this from windows using WSL2, but this guide will focus on the process using native Ubuntu.
+If you are running a Ubuntu 22.04 or 24.04 PC, you can proceed with these instructions.
+
+If you are running a Windows PC, you will need to first install WSL2 with Ubuntu 24.04 as the OS. See [ubuntu.com:install-ubuntu-wsl2](https://ubuntu.com/wsl/docs/stable/howto/install-ubuntu-wsl2/). You will also need to install the Zadig APX driver by following [these instructions](https://developer.nvidia.com/w/sdkmanager/resources/help/index.html#apx-driver). Make sure the development board is powered on and connected to the test PC as per the instructions above before installing the driver. 
+
+Previously SDK manager needed to be run from within the WSL2 environment. However recent releases of SDK manager can be run directly from the Windows host OS. Other steps, such as rootfs provisioning in Ansible, will require WSL2 to be run. So for any of the following steps requiring a command to be run from a termianl, please open a WSL2 terminal by pressing the window key and typing `ubuntu`.
+
+Next install the [NVIDIA SDK Manager tool](https://developer.nvidia.com/sdk-manager#i7njvai) to the PC. Note that you will need to register for a NVIDIA developer account in order to access some SDKs. But once SDKs are downloaded it's not necessary to remain logged into the NVIDIA developer account.
 
 Launch SDK manager. The Jetson development boards should be detected and SDK manager should display the following pop-up. Select the "Developer Kit Version" entry from the list and press OK
 
@@ -119,6 +125,8 @@ Next we will need to get the Jetson board connected to the internet in order to 
 
 The Jetson will show up as a USB Ethernet device to the development PC. One quick way to give the jetson internet access is to configure the development PC to share it's network connection with this USB Ethernet device. See [this post](https://askubuntu.com/questions/1104506/share-wireless-internet-connection-through-ethernet-on-18-04-lts) for a step-by-step walkthrough.
 
+Alternatively, if connection sharing isn't working out you can configure the Jetson to connect directly to your local Wifi hotspot:
+
 **Connecting over Wifi**
 
 ```
@@ -137,7 +145,7 @@ PING www.google.com (142.250.189.196) 56(84) bytes of data.
 
 **Provisioning with Ansible**
 
-First, on the development PC, ensure that the `ansible-core` package is installed. This can be done by executing `sudo apt install ansible-core`.
+First, on the development PC, ensure that the `ansible-core` package is installed. This can be done by executing `sudo apt install ansible ansible-core`.
 
 Next clone this repository to the development PC (or [Download it](../archive/refs/heads/main.zip) and extract it to a folder on the PC)
 
@@ -174,3 +182,39 @@ PLAY RECAP *********************************************************************
 192.168.55.1               : ok=31   changed=14   unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
 
 ```
+
+# Troubleshooting
+
+### APX Driver Not FOund
+
+If during the SDK manager install process you see "APX Driver Not Found":
+
+<a href="../assets/troubleshooting_apx_fail.png"><img src="../assets/troubleshooting_apx_fail.png" width="70%"></img></a>
+
+Ensure the NVIDIA APX driver is installed [using these instructions](https://developer.nvidia.com/w/sdkmanager/resources/help/index.html#apx-drive)
+
+### SDK Manager fails to detect jetson when installing SDK components
+
+If the SDK manager install process gets stuck on this screen:
+
+<a href="../assets/sdk_manager_step03_network_settings.png"><img src="../assets/sdk_manager_step03_network_settings.png" width="70%"></img></a>
+
+But the Jetson isn't detected in the "Selected Device" field:
+* Remove the jumper wire required to put the Jetson into recovery mode
+* Disconnect power from the jetson and then reconnect it, to force reboot into normal mode
+
+If running using WSL2, you may also need to force WSL2 to use the `mirrored` networking mode to remove NAT between SDK Manager and the local network. Edit `%UserProfile%\.wslconfig` and add the following lines:
+
+<a href="../assets/troubleshooting_networking_wsl2.png"><img src="../assets/troubleshooting_networking_wsl2.png" width="70%"></img></a>
+
+NOTE: Ensure that the path matches the version of JetPack being used.
+
+### SSH or Ansible fails to connect to the Jetson after flashing
+
+For example, if you see the following Ansible error:
+
+<a href="../assets/troubleshooting_ansible_ssh_host_key_checking.png"><img src="../assets/troubleshooting_ansible_ssh_host_key_checking.png" width="70%"></img></a>
+
+Try the following:
+
+<a href="../assets/troubleshooting_ansible_ssh_known_hosts.png"><img src="../assets/troubleshooting_ansible_ssh_known_hosts.png" width="70%"></img></a>

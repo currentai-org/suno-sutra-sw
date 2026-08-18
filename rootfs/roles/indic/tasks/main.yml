@@ -81,6 +81,25 @@
     virtualenv: ~/bhashini_models/venv
     virtualenv_site_packages: yes
 
+# onnxruntime and onnxruntime-gpu both ship a top-level onnxruntime/ package,
+# so installing one after the other into a shared site-packages dir silently
+# clobbers the other's files while pip's metadata still lists both as present.
+# Because this venv has virtualenv_site_packages: yes, it inherits
+# /usr/local/lib/python3.10/dist-packages, where piper-tts (pocketinfer)
+# installs plain onnxruntime system-wide. pip's "already satisfied" check
+# considers that inherited copy, so the bulk requirements.txt install above
+# can skip reinstalling onnxruntime-gpu if matching metadata is already
+# visible system-wide - even when the underlying files there are actually the
+# CPU-only build. Force a fresh, dependency-free copy directly into this venv
+# so ASR always gets a working GPU build regardless of system-wide state.
+- name: Force onnxruntime-gpu into the venv, shadowing any system-wide plain onnxruntime
+  ansible.builtin.pip:
+    name: onnxruntime-gpu
+    state: forcereinstall
+    extra_args: --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126 --no-deps
+    virtualenv: ~/bhashini_models/venv
+    virtualenv_site_packages: yes
+
 - name: Clone Flite repository
   ansible.builtin.git:
     repo: http://github.com/festvox/flite
