@@ -28,12 +28,12 @@ class PocketInferDevboard(Board):
         super().__init__(args)
         # Circuitpython modules may have already initialized in TEGRA_SOC mode.
         GPIO.setmode(GPIO.TEGRA_SOC)
-        GPIO.setup(self.TRIGGER_BOARD_IDX, GPIO.IN)
-        GPIO.add_event_detect(self.TRIGGER_BOARD_IDX, GPIO.BOTH, callback=self.trig_cb, bouncetime=100)
+        GPIO.setup(self.TRIGGER_BOARD_IDX, GPIO.IN) # type: ignore
+        GPIO.add_event_detect(self.TRIGGER_BOARD_IDX, GPIO.BOTH, callback=self.trig_cb, bouncetime=100) # type: ignore
 
     def trig_cb(self, channel):
         pass
-        if GPIO.input(self.TRIGGER_BOARD_IDX):
+        if GPIO.input(self.TRIGGER_BOARD_IDX): # type: ignore
             self.trigger_button = True
             self.trigger_button_down.set()
             self.logger.debug("Trigger button down")

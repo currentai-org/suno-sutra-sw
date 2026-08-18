@@ -7,12 +7,15 @@ import logging
 from pathlib import Path
 from appdirs import user_cache_dir
 
+from pocketinfer.models.base import BaseModel, register_model
 
-class Piper:
+
+@register_model
+class Piper(BaseModel):
     MODEL_DIR = Path(user_cache_dir("pocketinfer")) / "piper_voice"
 
     def __init__(self, voice_name, audio_device):
-        self.logger = logging.getLogger(__name__)
+        super().__init__()
         self.voice_name = voice_name
         self.audio_device = audio_device
         self.voice = PiperVoice.load(model_path=Path(self.MODEL_DIR, voice_name + ".onnx"),
@@ -25,7 +28,7 @@ class Piper:
             normalize_audio=True,
             volume=1.0,
         )
-        self.thread = threading.Thread
+        self.thread = threading.Thread()
         self.playing = False
     
     def _synthesize_and_play(self, text):
@@ -48,21 +51,19 @@ class Piper:
             self.playing = False
             self.thread.join()
     
-    @classmethod
-    def verify(cls, args):
-        if not os.path.exists(cls.MODEL_DIR):
-            return False, f"Piper model directory does not exist: {cls.MODEL_DIR}"
+    def verify(self):
+        if not os.path.exists(self.MODEL_DIR):
+            return False
         try:
-            PiperVoice.load(model_path=Path(cls.MODEL_DIR, args["voice_name"] + ".onnx"),
-                            config_path=Path(cls.MODEL_DIR, args["voice_name"] + ".onnx.json"))
-            return True, f"Piper voice '{args['voice_name']}' loaded successfully."
+            PiperVoice.load(model_path=Path(self.MODEL_DIR, self.voice_name + ".onnx"),
+                            config_path=Path(self.MODEL_DIR, self.voice_name + ".onnx.json"))
+            return True
         except Exception as e:
-            return False, str(e)
+            return False
         
-    @classmethod
-    def update(cls, args):
-        if not os.path.exists(cls.MODEL_DIR):
-            os.makedirs(cls.MODEL_DIR)
+    def update(self, args):
+        if not os.path.exists(self.MODEL_DIR):
+            os.makedirs(self.MODEL_DIR)
         # For Piper, we might download or update the voice model here
-        logging.info(f"Downloading Piper voice '{args['voice_name']}'")
-        download_voice(args["voice_name"], cls.MODEL_DIR)
+        logging.info(f"Downloading Piper voice '{self.voice_name}'")
+        download_voice(self.voice_name, self.MODEL_DIR)

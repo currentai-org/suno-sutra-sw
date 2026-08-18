@@ -8,19 +8,22 @@ from appdirs import user_cache_dir
 from pathlib import Path
 from typing import TypedDict, cast
 
+from pocketinfer.models.base import BaseModel, register_model
+
 
 class VoskResponse(TypedDict):
     text: str
 
-class Vosk:
+@register_model
+class Vosk(BaseModel):
     MODEL_DIR = Path(user_cache_dir("pocketinfer")) / "vosk_model"
 
     def __init__(self, model_name):
-        self.logger = logging.getLogger(__name__)
+        super().__init__()
         self.model_name = model_name
         self.model_path = os.path.join(self.MODEL_DIR, model_name)
 
-    def recognize(self, audio_data: AudioData, verbose: bool = False) -> str:
+    def recognize(self, audio_data: AudioData) -> VoskResponse:
         if not os.path.exists(self.model_path):
             raise RuntimeError(
                 f"Vosk model not found at {self.model_path}. "
@@ -37,26 +40,22 @@ class Vosk:
         final_recognition: str = rec.FinalResult()
 
         result = cast(VoskResponse, json.loads(final_recognition))
-        if verbose:
-            return result
 
         return result
 
     
-    @classmethod
-    def verify(cls, args):
-        path = os.path.join(cls.MODEL_DIR, args["model_name"])
+    def verify(self):
+        path = os.path.join(self.MODEL_DIR, self.model_name)
         if not os.path.exists(path):
-            return False, f"Vosk model not found at {path}"
-        return True, "Vosk model is available."
+            return False
+        return True
 
-    @classmethod
-    def update(cls, args):
-        path = os.path.join(cls.MODEL_DIR, args["model_name"])
+    def update(self, args):
+        path = os.path.join(self.MODEL_DIR, args["model_name"])
         if not os.path.exists(path):
             os.makedirs(path)
         logging.info(f"Downloading Vosk model '{args['model_name']}'")
         download_vosk_model(
             f"https://alphacephei.com/vosk/models/{args['model_name']}.zip",
             path
-        ) 
+        )
